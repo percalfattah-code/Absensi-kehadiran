@@ -15,14 +15,18 @@ import {
   FileSpreadsheet,
   AlertCircle,
   Sparkles,
+  Megaphone,
+  Send,
+  Calendar,
 } from 'lucide-react';
-import { AttendanceSession, AttendanceRecord, Member } from '../types';
+import { AttendanceSession, AttendanceRecord, Member, EventAnnouncement } from '../types';
 
 interface AdminDashboardProps {
   session: AttendanceSession | null;
   members?: Member[];
   allMembers?: Member[];
   records: AttendanceRecord[];
+  announcements?: EventAnnouncement[];
   countdownText?: string;
   onToggleSession?: () => void;
   onExportPdf?: () => void;
@@ -34,6 +38,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   members = [],
   allMembers = [],
   records,
+  announcements = [],
   countdownText = '00:00:00',
   onToggleSession,
   onExportPdf,
@@ -44,6 +49,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const attendedCount = records.length;
   const missingCount = Math.max(0, totalMembers - attendedCount);
   const percentage = totalMembers > 0 ? Math.round((attendedCount / totalMembers) * 100) : 0;
+  const latestAnnouncement = announcements.length > 0 ? announcements[0] : null;
 
   return (
     <div className="space-y-6 pb-24">
@@ -62,29 +68,73 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </p>
         </div>
 
-        {onToggleSession && session && (
-          <button
-            onClick={onToggleSession}
-            className={`px-5 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
-              session.isOpen
-                ? 'btn-3d-rose text-white'
-                : 'btn-3d-emerald text-white'
-            }`}
-          >
-            {session.isOpen ? (
-              <>
-                <Square className="w-4 h-4 fill-white" />
-                <span>Tutup Sesi Absensi</span>
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4 fill-white" />
-                <span>Buka Sesi Absensi</span>
-              </>
-            )}
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('pengumuman')}
+              className="px-4 py-3.5 btn-3d-amber text-purple-950 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg"
+            >
+              <Megaphone className="w-4 h-4" />
+              <span>Kirim Pemberitahuan</span>
+            </button>
+          )}
+
+          {onToggleSession && session && (
+            <button
+              onClick={onToggleSession}
+              className={`px-5 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                session.isOpen
+                  ? 'btn-3d-rose text-white'
+                  : 'btn-3d-emerald text-white'
+              }`}
+            >
+              {session.isOpen ? (
+                <>
+                  <Square className="w-4 h-4 fill-white" />
+                  <span>Tutup Sesi Absensi</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>Buka Sesi Absensi</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* QUICK AGENDA BROADCAST BANNER */}
+      {latestAnnouncement && (
+        <div className="card-3d p-4 bg-gradient-to-r from-violet-950 via-[#1f0b3b] to-purple-950 border-amber-400/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-400 text-amber-300 flex items-center justify-center shrink-0">
+              <Megaphone className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-violet-900 text-amber-300 border border-violet-700">
+                  Agenda Terbaru
+                </span>
+                <span className="text-xs font-black text-white">{latestAnnouncement.title}</span>
+              </div>
+              <div className="text-[11px] text-violet-300 mt-0.5">
+                📅 {latestAnnouncement.eventDate} • ⏰ {latestAnnouncement.eventTime || '19:30 WIB'} • 📍 {latestAnnouncement.location || 'Balai Karang Taruna'}
+              </div>
+            </div>
+          </div>
+
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('pengumuman')}
+              className="px-4 py-2 btn-3d-violet text-amber-300 rounded-xl text-xs font-black flex items-center gap-1.5 shrink-0"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Broadcast ke Anggota</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 3D METRIC STAT CARDS (4-GRID) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

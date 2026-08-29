@@ -643,6 +643,10 @@ export default function App() {
                 members={members}
                 records={attendanceRecords}
                 session={session}
+                announcements={announcements}
+                countdownText={countdownText}
+                onToggleSession={handleToggleSession}
+                onNavigate={(v) => setCurrentView(v)}
               />
             </motion.div>
           )}

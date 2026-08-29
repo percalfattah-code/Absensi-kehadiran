@@ -14,7 +14,10 @@ import {
   Sliders,
   Zap,
   ChevronDown,
-  Video
+  Video,
+  Volume2,
+  VolumeX,
+  XCircle,
 } from 'lucide-react';
 import { Member, VerificationProgress, LivenessTask } from '../types';
 import {
@@ -28,6 +31,7 @@ import {
   compareFaceLandmarkFeatures,
   extractLandmarksFromImage,
 } from '../services/faceDetection';
+import { audioService } from '../services/audioService';
 
 interface CameraViewProps {
   member?: Member;
@@ -57,6 +61,9 @@ export const CameraView: React.FC<CameraViewProps> = ({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
+
+  // Sound/TTS Audio Toggle
+  const [isSoundMuted, setIsSoundMuted] = useState(false);
 
   // Camerafacing mode & device list
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>(() => {
@@ -90,6 +97,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
   // Reference Face Matching State
   const isCapturingRef = useRef<boolean>(false);
   const eyeClosedRef = useRef<boolean>(false);
+  const lastTaskSpokenRef = useRef<string>('');
   const [refFeatureVector, setRefFeatureVector] = useState<number[] | null>(member.faceLandmarks || null);
   const [mismatchError, setMismatchError] = useState<string | null>(null);
 
@@ -164,6 +172,11 @@ export const CameraView: React.FC<CameraViewProps> = ({
         await videoRef.current.play();
         setIsCameraReady(true);
         setStatusMessage('Posisikan wajah di dalam bingkai oval');
+        
+        // Voice Instruction: Posisikan wajah di tengah kamera
+        if (!isSoundMuted) {
+          audioService.speakLookCamera();
+        }
       }
 
       // Save user choice to localStorage for instant re-use without re-prompts
@@ -194,7 +207,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
         setCameraError('Gagal memuat kamera: ' + (err.message || 'Error tidak diketahui'));
       }
     }
-  }, [facingMode, selectedDeviceId, stream, enumerateCameraDevices]);
+  }, [facingMode, selectedDeviceId, stream, enumerateCameraDevices, isSoundMuted]);
 
   // Initial mount
   useEffect(() => {
@@ -202,6 +215,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
     initFaceLandmarker(); // Pre-warm MediaPipe model
 
     return () => {
+      audioService.stopSpeaking();
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
@@ -223,6 +237,24 @@ export const CameraView: React.FC<CameraViewProps> = ({
     setShowDevicePicker(false);
     startCamera(facingMode, devId);
   };
+
+  // Trigger Indonesian Voice Prompt on Task Change
+  useEffect(() => {
+    if (!isCameraReady || isSoundMuted || progress.completed || mismatchError) return;
+    const task = livenessSequence[currentTaskIndex];
+    if (!task) return;
+
+    if (lastTaskSpokenRef.current !== task) {
+      lastTaskSpokenRef.current = task;
+      if (task === 'LOOK_CAMERA') {
+        audioService.speakLookCamera();
+      } else if (task === 'SMILE') {
+        audioService.speakSmile();
+      } else if (task === 'BLINK') {
+        audioService.speakBlink();
+      }
+    }
+  }, [currentTaskIndex, livenessSequence, isCameraReady, isSoundMuted, progress.completed, mismatchError]);
 
   // Real-time Frame Analysis Loop
   useEffect(() => {
@@ -263,16 +295,24 @@ export const CameraView: React.FC<CameraViewProps> = ({
             // Single face detected!
             const landmarks = landmarksResult.faceLandmarks[0];
 
-            // Anti-Spoofing & Face Match Check against registered member photo
+            // STRICT BIOMETRIC IDENTITY VERIFICATION AGAINST REGISTERED MEMBER PHOTO
             if (refFeatureVector && refFeatureVector.length > 0) {
               const liveVector = extractFacialFeatureVector(landmarks);
               const { isMatch, matchPercentage } = compareFaceLandmarkFeatures(liveVector, refFeatureVector);
 
               if (!isMatch) {
-                setMismatchError(`Wajah tidak cocok dengan foto terdaftar milik ${member.name} (Tingkat Kemiripan: ${matchPercentage}%)`);
-                setStatusMessage(`⚠️ WAJAH BERBEDA! Wajah tidak cocok dengan foto ${member.name}`);
-                drawFaceLandmarks(ctx, landmarks, canvas.width, canvas.height, '#EF4444');
+                const errMsg = `Wajah tidak sesuai dengan foto anggota ${member.name} (${matchPercentage}% kecocokan)`;
+                setMismatchError(errMsg);
+                setStatusMessage(`⛔ WAJAH DITOLAK! Bukan wajah anggota ${member.name}`);
+                
+                // Voice warning: wajah tidak sesuai
+                if (!isSoundMuted) {
+                  audioService.speakFaceMismatch(member.name);
+                }
+
+                drawFaceLandmarks(ctx, landmarks, canvas.width, canvas.height, '#F43F5E');
                 setProgress((prev) => ({ ...prev, faceDetected: true, singleFace: true }));
+                
                 if (!isCapturingRef.current) {
                   animFrameId = requestAnimationFrame(analyzeFrame);
                 }
@@ -282,7 +322,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
               }
             }
 
-            const strokeColor = filterMode === 'CYBER_GRID' ? '#3B82F6' : '#10B981';
+            const strokeColor = filterMode === 'CYBER_GRID' ? '#A855F7' : '#10B981';
             drawFaceLandmarks(ctx, landmarks, canvas.width, canvas.height, strokeColor);
 
             setProgress((prev) => ({ ...prev, faceDetected: true, singleFace: true }));
@@ -347,19 +387,25 @@ export const CameraView: React.FC<CameraViewProps> = ({
     return () => {
       cancelAnimationFrame(animFrameId);
     };
-  }, [isCameraReady, currentTaskIndex, livenessSequence, progress.completed, filterMode]);
+  }, [isCameraReady, currentTaskIndex, livenessSequence, progress.completed, filterMode, refFeatureVector, member.name, isSoundMuted]);
 
-  // Completion Handler with Shutter Flash Effect
+  // Completion Handler with Shutter Flash & Harmonic Success Chime + Voice
   const triggerCompletion = async (video: HTMLVideoElement, landmarks?: any) => {
     if (isCapturingRef.current) return;
     isCapturingRef.current = true;
 
-    // Trigger Shutter Flash Visual Animation
+    // Trigger Shutter Sound & Flash Visual Animation
+    audioService.playCameraShutter();
     setIsShutterFlashing(true);
     setTimeout(() => setIsShutterFlashing(false), 300);
 
     setProgress((prev) => ({ ...prev, completed: true }));
     setStatusMessage('Verifikasi Berhasil! Mengambil foto...');
+
+    // Play Success Chime & Indonesian TTS Greeting
+    if (!isSoundMuted) {
+      audioService.speakSuccess(member.name);
+    }
 
     try {
       const isFront = facingMode === 'user';
@@ -368,7 +414,9 @@ export const CameraView: React.FC<CameraViewProps> = ({
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
-      notifySuccess(blob);
+      setTimeout(() => {
+        notifySuccess(blob);
+      }, 600);
     } catch (e) {
       console.error('Photo capture error:', e);
       setCameraError('Gagal mengambil foto. Silakan coba lagi.');
@@ -376,10 +424,16 @@ export const CameraView: React.FC<CameraViewProps> = ({
     }
   };
 
-  // Simulation Fallback for testing / low-light manual trigger
+  // Simulation Fallback for testing / low-light manual trigger (blocked if mismatch detected)
   const handleSimulatedVerification = async () => {
     if (!videoRef.current) return;
+    if (mismatchError) {
+      alert(`Verifikasi ditolak! Wajah Anda tidak sesuai dengan data anggota ${member.name}. Silakan gunakan wajah anggota yang benar.`);
+      return;
+    }
+
     isCapturingRef.current = true;
+    audioService.playCameraShutter();
     setIsShutterFlashing(true);
     setTimeout(() => setIsShutterFlashing(false), 300);
 
@@ -390,7 +444,11 @@ export const CameraView: React.FC<CameraViewProps> = ({
       blinkDetected: true,
       completed: true,
     });
-    setStatusMessage('Verifikasi Manual Berhasil!');
+    setStatusMessage('Verifikasi Berhasil!');
+
+    if (!isSoundMuted) {
+      audioService.speakSuccess(member.name);
+    }
 
     try {
       const isFront = facingMode === 'user';
@@ -398,7 +456,9 @@ export const CameraView: React.FC<CameraViewProps> = ({
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
-      notifySuccess(blob);
+      setTimeout(() => {
+        notifySuccess(blob);
+      }, 500);
     } catch (e) {
       setCameraError('Gagal mengambil foto snapshot.');
       isCapturingRef.current = false;
@@ -443,6 +503,19 @@ export const CameraView: React.FC<CameraViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Sound / TTS Voice Guide Toggle */}
+          <button
+            onClick={() => setIsSoundMuted(!isSoundMuted)}
+            className={`p-2 rounded-xl border text-xs font-bold transition-all ${
+              isSoundMuted
+                ? 'btn-3d-dark text-violet-400'
+                : 'btn-3d-violet text-amber-300'
+            }`}
+            title={isSoundMuted ? 'Nyalakan Suara Panduan TTS' : 'Matikan Suara TTS'}
+          >
+            {isSoundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-amber-300" />}
+          </button>
+
           {/* Multi-camera device selector toggle */}
           {availableDevices.length > 1 && (
             <button
@@ -456,7 +529,10 @@ export const CameraView: React.FC<CameraViewProps> = ({
           )}
 
           <button
-            onClick={onCancel}
+            onClick={() => {
+              audioService.stopSpeaking();
+              onCancel();
+            }}
             className="px-3.5 py-1.5 btn-3d-rose text-white rounded-xl text-xs font-bold transition-all"
           >
             Batal
@@ -464,7 +540,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
         </div>
       </div>
 
-      {/* Camera Device Selector Modal Sheet */}
+      {/* Camera Device Picker Dropdown Modal */}
       <AnimatePresence>
         {showDevicePicker && (
           <motion.div
@@ -507,11 +583,11 @@ export const CameraView: React.FC<CameraViewProps> = ({
         <AnimatePresence>
           {isShutterFlashing && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              initial={{ opacity: 0.9 }}
+              animate={{ opacity: 0 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="absolute inset-0 bg-white z-50 pointer-events-none"
+              transition={{ duration: 0.25 }}
+              className="absolute inset-0 bg-white z-40 pointer-events-none"
             />
           )}
         </AnimatePresence>
@@ -531,22 +607,23 @@ export const CameraView: React.FC<CameraViewProps> = ({
           </div>
         ) : (
           <>
-            {/* Live Video Stream Feed */}
+            {/* Live Video Feed */}
             <video
               ref={videoRef}
               playsInline
               muted
+              autoPlay
               style={{ filter: getFilterCss() }}
-              className={`w-full h-full object-cover transition-all duration-300 ${
-                facingMode === 'user' ? '-scale-x-100' : 'scale-x-100'
+              className={`w-full h-full object-cover ${
+                facingMode === 'user' ? 'scale-x-[-1]' : ''
               }`}
             />
 
-            {/* Landmark Canvas Overlay */}
+            {/* Landmarks Overlay Canvas */}
             <canvas
               ref={canvasRef}
-              className={`absolute inset-0 w-full h-full object-cover pointer-events-none ${
-                facingMode === 'user' ? '-scale-x-100' : 'scale-x-100'
+              className={`absolute inset-0 w-full h-full pointer-events-none z-10 ${
+                facingMode === 'user' ? 'scale-x-[-1]' : ''
               }`}
             />
 
@@ -554,7 +631,9 @@ export const CameraView: React.FC<CameraViewProps> = ({
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
               <div
                 className={`relative w-52 h-68 rounded-[50%] border-4 transition-all duration-300 overflow-hidden ${
-                  progress.completed
+                  mismatchError
+                    ? 'border-rose-500 bg-rose-500/25 shadow-[0_0_40px_rgba(244,63,94,0.9)] animate-pulse'
+                    : progress.completed
                     ? 'border-emerald-400 bg-emerald-500/20 shadow-[0_0_40px_rgba(16,185,129,0.8)]'
                     : progress.faceDetected && progress.singleFace
                     ? 'border-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.6)]'
@@ -562,7 +641,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
                 }`}
               >
                 {/* Laser Biometric Scan Line Animation */}
-                {isCameraReady && !progress.completed && (
+                {!progress.completed && !mismatchError && (
                   <motion.div
                     animate={{ top: ['0%', '100%', '0%'] }}
                     transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
@@ -572,29 +651,32 @@ export const CameraView: React.FC<CameraViewProps> = ({
               </div>
             </div>
 
-            {/* Floating Top Status Badge Prompt */}
-            <div className="absolute top-8 inset-x-4 flex justify-center z-20">
+            {/* Live Instruction Pill Banner */}
+            <div className="absolute top-8 left-4 right-4 z-20 flex justify-center">
               <motion.div
-                key={mismatchError || statusMessage}
-                initial={{ opacity: 0, y: -8 }}
+                initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`px-4 py-2 rounded-full backdrop-blur-md border text-xs font-extrabold text-center shadow-lg transition-all ${
+                className={`px-4 py-2 rounded-2xl backdrop-blur-md border text-xs font-black text-center shadow-lg transition-all max-w-[90%] ${
                   mismatchError
-                    ? 'bg-rose-950/90 text-rose-300 border-rose-500 shadow-rose-950/50'
+                    ? 'bg-rose-950/95 text-rose-200 border-rose-500 shadow-rose-950/60'
                     : progress.completed
-                    ? 'bg-emerald-950/90 text-emerald-300 border-emerald-400'
-                    : 'bg-[#15072d]/90 text-amber-300 border-violet-600/80 shadow-[0_4px_12px_rgba(0,0,0,0.5)]'
+                    ? 'bg-emerald-950/95 text-emerald-300 border-emerald-400'
+                    : 'bg-[#15072d]/95 text-amber-300 border-violet-600/80 shadow-[0_4px_12px_rgba(0,0,0,0.5)]'
                 }`}
               >
                 {mismatchError ? (
-                  <AlertTriangle className="w-4 h-4 inline mr-1.5 text-rose-400 shrink-0" />
+                  <div className="flex items-center gap-1.5 justify-center">
+                    <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{statusMessage}</span>
+                  </div>
                 ) : (
                   <>
                     {currentTask === 'SMILE' && <Smile className="w-4 h-4 inline mr-1.5 text-amber-300" />}
                     {currentTask === 'BLINK' && <Eye className="w-4 h-4 inline mr-1.5 text-amber-300" />}
+                    {currentTask === 'LOOK_CAMERA' && <Camera className="w-4 h-4 inline mr-1.5 text-amber-300" />}
+                    <span>{statusMessage}</span>
                   </>
                 )}
-                <span>{mismatchError || statusMessage}</span>
               </motion.div>
             </div>
 
@@ -629,11 +711,33 @@ export const CameraView: React.FC<CameraViewProps> = ({
                 <Zap className="w-3 h-3" />
                 <span>{facingMode === 'user' ? 'Depan' : 'Belakang'}</span>
               </span>
-              <span className="truncate max-w-[150px]">{filterMode.replace('_', ' ')}</span>
+              <span className="text-violet-300">
+                {isSoundMuted ? '🔇 Audio Mute' : '🔊 TTS Aktif'}
+              </span>
             </div>
           </>
         )}
       </div>
+
+      {/* Mismatch Alert Box if Rejected */}
+      {mismatchError && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="p-4 rounded-2xl bg-rose-950/90 border-2 border-rose-500 text-rose-200 text-xs space-y-2 shadow-lg"
+        >
+          <div className="flex items-center gap-2 font-black text-rose-300 text-sm">
+            <XCircle className="w-5 h-5 text-rose-400 shrink-0" />
+            <span>Verifikasi Wajah Ditolak</span>
+          </div>
+          <p className="leading-relaxed">
+            {mismatchError}. Absensi hanya dapat diselesaikan oleh pemilik wajah yang sesuai dengan database profil.
+          </p>
+          <div className="text-[11px] text-rose-400 font-medium">
+            Silakan minta anggota bersangkutan (<span className="font-bold text-white">{member.name}</span>) berada di depan kamera.
+          </div>
+        </motion.div>
+      )}
 
       {/* Camera Visual Effects Filter Selector Bar in 3D Card */}
       <div className="card-3d-subtle p-3 space-y-2 text-white">
@@ -650,9 +754,9 @@ export const CameraView: React.FC<CameraViewProps> = ({
             [
               { id: 'CYBER_GRID', label: 'Cyber', icon: Sparkles },
               { id: 'SOFT_BEAUTY', label: 'Beauty', icon: Sun },
-              { id: 'HIGH_CONTRAST_MONO', label: 'Mono', icon: ShieldCheck },
-              { id: 'WARM_SUNLIGHT', label: 'Warm', icon: Smile },
-              { id: 'NORMAL', label: 'Normal', icon: Camera },
+              { id: 'HIGH_CONTRAST_MONO', label: 'Mono', icon: Zap },
+              { id: 'WARM_SUNLIGHT', label: 'Warm', icon: Sun },
+              { id: 'NORMAL', label: 'Asli', icon: Camera },
             ] as const
           ).map((filter) => {
             const Icon = filter.icon;
@@ -686,17 +790,38 @@ export const CameraView: React.FC<CameraViewProps> = ({
         <div className="grid grid-cols-2 gap-2 text-xs font-bold">
           <div
             className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
-              progress.faceDetected && progress.singleFace
+              progress.faceDetected && progress.singleFace && !mismatchError
                 ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
                 : 'bg-[#110526] border-violet-800/60 text-violet-500'
             }`}
           >
             <CheckCircle2
               className={`w-4 h-4 ${
-                progress.faceDetected && progress.singleFace ? 'text-emerald-400' : 'text-violet-700'
+                progress.faceDetected && progress.singleFace && !mismatchError ? 'text-emerald-400' : 'text-violet-700'
               }`}
             />
             <span>Wajah Terdeteksi</span>
+          </div>
+
+          <div
+            className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
+              refFeatureVector && !mismatchError && progress.faceDetected
+                ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
+                : mismatchError
+                ? 'bg-rose-950/80 border-rose-500/50 text-rose-300'
+                : 'bg-[#110526] border-violet-800/60 text-violet-500'
+            }`}
+          >
+            <CheckCircle2
+              className={`w-4 h-4 ${
+                refFeatureVector && !mismatchError && progress.faceDetected
+                  ? 'text-emerald-400'
+                  : mismatchError
+                  ? 'text-rose-400'
+                  : 'text-violet-700'
+              }`}
+            />
+            <span>Kecocokan Identitas</span>
           </div>
 
           <div
@@ -724,23 +849,10 @@ export const CameraView: React.FC<CameraViewProps> = ({
             />
             <span>Kedipan Terdeteksi</span>
           </div>
-
-          <div
-            className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
-              progress.completed
-                ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
-                : 'bg-[#110526] border-violet-800/60 text-violet-500'
-            }`}
-          >
-            <CheckCircle2
-              className={`w-4 h-4 ${progress.completed ? 'text-emerald-400' : 'text-violet-700'}`}
-            />
-            <span>Verifikasi Berhasil</span>
-          </div>
         </div>
 
-        {/* Fallback Manual Verification Button */}
-        {isCameraReady && !progress.completed && (
+        {/* Fallback Manual Verification Button (Disabled if mismatch detected) */}
+        {isCameraReady && !progress.completed && !mismatchError && (
           <div className="pt-2 border-t border-violet-800/60 flex items-center justify-between text-xs">
             <span className="text-[11px] text-violet-400 font-medium">Cahaya redup?</span>
             <button

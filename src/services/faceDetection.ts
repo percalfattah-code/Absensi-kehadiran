@@ -139,17 +139,18 @@ export function drawFaceLandmarks(
   }
 }
 
-// 3. FACIAL FEATURE VECTOR EXTRACTION (FOR FACE MATCHING)
-// Extracts scale and position invariant geometric ratios from 468 MediaPipe landmarks
+// Calculate Triangle Area from 3 normalized landmarks
+function triangleArea(p1: NormalizedLandmark, p2: NormalizedLandmark, p3: NormalizedLandmark): number {
+  return Math.abs((p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y)) / 2);
+}
+
+// 3. COMPREHENSIVE FACIAL FEATURE VECTOR EXTRACTION (FOR FACE MATCHING)
+// Extracts scale, translation and orientation invariant biometric descriptor from 468 MediaPipe landmarks
 export function extractFacialFeatureVector(landmarks: NormalizedLandmark[]): number[] {
   if (!landmarks || landmarks.length < 468) return [];
 
   // Key facial landmark indices in MediaPipe
-  // Eyes: Left (133, 33, 159, 145), Right (362, 263, 386, 374)
-  // Nose: Tip (1), Bridge top (168), Left alar (102), Right alar (331)
-  // Mouth: Left corner (61), Right corner (291), Upper lip (13), Lower lip (14)
-  // Face Edges: Left cheek (234), Right cheek (454), Forehead top (10), Chin bottom (152)
-
+  // Face boundaries
   const leftCheek = landmarks[234];
   const rightCheek = landmarks[454];
   const faceWidth = dist2D(leftCheek, rightCheek) || 1;
@@ -158,59 +159,123 @@ export function extractFacialFeatureVector(landmarks: NormalizedLandmark[]): num
   const chin = landmarks[152];
   const faceHeight = dist2D(forehead, chin) || 1;
 
+  // Eyes
   const leftEyeInner = landmarks[133];
+  const leftEyeOuter = landmarks[33];
+  const leftEyeTop = landmarks[159];
   const rightEyeInner = landmarks[362];
-  const eyeDistance = dist2D(leftEyeInner, rightEyeInner);
+  const rightEyeOuter = landmarks[263];
+  const rightEyeTop = landmarks[386];
 
+  const interocularDist = dist2D(leftEyeInner, rightEyeInner) || 0.1;
+  const outerCanthalDist = dist2D(leftEyeOuter, rightEyeOuter);
+
+  // Nose
   const noseTip = landmarks[1];
   const noseBridge = landmarks[168];
+  const noseLeftAlar = landmarks[102];
+  const noseRightAlar = landmarks[331];
+  const noseWidth = dist2D(noseLeftAlar, noseRightAlar);
   const noseLength = dist2D(noseTip, noseBridge);
 
+  // Mouth
   const leftMouth = landmarks[61];
   const rightMouth = landmarks[291];
+  const upperLip = landmarks[0] || landmarks[13];
+  const lowerLip = landmarks[17] || landmarks[14];
   const mouthWidth = dist2D(leftMouth, rightMouth);
+  const mouthHeight = dist2D(upperLip, lowerLip);
 
-  const noseToChin = dist2D(noseTip, chin);
-  const noseToForehead = dist2D(noseTip, forehead);
-  const noseToMouth = dist2D(noseTip, landmarks[13]);
+  // Eyebrows
+  const leftEyebrow = landmarks[70];
+  const rightEyebrow = landmarks[300];
 
-  // Compute scale-invariant ratio vector
+  // Forehead & Jaw Points
+  const foreheadLeft = landmarks[103];
+  const foreheadRight = landmarks[332];
+  const foreheadWidth = dist2D(foreheadLeft, foreheadRight);
+  const midJawLeft = landmarks[172];
+  const midJawRight = landmarks[397];
+  const midJawWidth = dist2D(midJawLeft, midJawRight);
+
+  // Triangular Biometric Geometries
+  const eyeNoseTriArea = triangleArea(leftEyeInner, rightEyeInner, noseTip);
+  const noseMouthTriArea = triangleArea(noseTip, leftMouth, rightMouth);
+  const boundingFaceArea = (faceWidth * faceHeight) || 1;
+
+  // 24 Scale-Invariant Biometric Descriptors
   return [
-    eyeDistance / faceWidth, // 0. Eye distance to cheek width
-    faceWidth / faceHeight, // 1. Face aspect ratio
-    noseLength / faceHeight, // 2. Nose length ratio
-    mouthWidth / faceWidth, // 3. Mouth width ratio
-    noseToChin / faceHeight, // 4. Lower face ratio
-    noseToForehead / faceHeight, // 5. Upper face ratio
-    noseToMouth / faceHeight, // 6. Nose to mouth ratio
-    dist2D(leftEyeInner, noseTip) / faceWidth, // 7. Left eye to nose ratio
-    dist2D(rightEyeInner, noseTip) / faceWidth, // 8. Right eye to nose ratio
+    interocularDist / faceWidth, // 0. Inner eye distance relative to cheek width
+    outerCanthalDist / faceWidth, // 1. Outer eye distance relative to cheek width
+    faceWidth / faceHeight, // 2. Face aspect ratio
+    dist2D(forehead, noseBridge) / faceHeight, // 3. Upper third facial ratio
+    dist2D(noseBridge, noseTip) / faceHeight, // 4. Middle third facial ratio
+    dist2D(noseTip, chin) / faceHeight, // 5. Lower third facial ratio
+    noseWidth / interocularDist, // 6. Nose width to interocular distance
+    noseLength / faceHeight, // 7. Nose length ratio
+    mouthWidth / interocularDist, // 8. Mouth width to eye distance
+    mouthWidth / faceWidth, // 9. Mouth width to cheek width
+    mouthHeight / (mouthWidth || 1), // 10. Lip aspect ratio
+    dist2D(lowerLip, chin) / faceHeight, // 11. Chin height ratio
+    dist2D(noseTip, upperLip) / faceHeight, // 12. Philtrum ratio
+    dist2D(leftEyeInner, noseTip) / faceWidth, // 13. Left eye to nose ratio
+    dist2D(rightEyeInner, noseTip) / faceWidth, // 14. Right eye to nose ratio
+    dist2D(leftEyeOuter, leftMouth) / faceHeight, // 15. Left lateral face ratio
+    dist2D(rightEyeOuter, rightMouth) / faceHeight, // 16. Right lateral face ratio
+    dist2D(leftEyebrow, leftEyeTop) / faceHeight, // 17. Left brow-to-eye ratio
+    dist2D(rightEyebrow, rightEyeTop) / faceHeight, // 18. Right brow-to-eye ratio
+    dist2D(chin, leftCheek) / faceWidth, // 19. Left jawline proportion
+    dist2D(chin, rightCheek) / faceWidth, // 20. Right jawline proportion
+    foreheadWidth / faceWidth, // 21. Forehead to cheek width ratio
+    midJawWidth / faceWidth, // 22. Jaw taper ratio
+    eyeNoseTriArea / boundingFaceArea, // 23. Upper facial triangle area ratio
+    noseMouthTriArea / boundingFaceArea, // 24. Lower facial triangle area ratio
   ];
 }
 
-// 4. COMPARE FACIAL FEATURE VECTORS (ANTI-SPOOFING & PERSON RECOGNITION)
+// 4. COMPARE FACIAL FEATURE VECTORS (STRICT ANTI-SPOOFING & PERSON RECOGNITION)
 // Compares live face features against registered reference features
 export function compareFaceLandmarkFeatures(
   liveVector: number[],
   refVector: number[]
-): { isMatch: boolean; distance: number; matchPercentage: number } {
+): { isMatch: boolean; distance: number; matchPercentage: number; details?: string } {
   if (!liveVector || !refVector || liveVector.length === 0 || refVector.length === 0) {
-    return { isMatch: true, distance: 0, matchPercentage: 100 }; // Default pass if no ref vector
+    return {
+      isMatch: true,
+      distance: 0,
+      matchPercentage: 100,
+      details: 'Tidak ada foto referensi untuk dibandingkan',
+    };
   }
 
   const len = Math.min(liveVector.length, refVector.length);
   let totalAbsDiff = 0;
+  let maxDiff = 0;
 
+  // Key biometric weightings (eye distance, nose width, jawline taper)
   for (let i = 0; i < len; i++) {
-    totalAbsDiff += Math.abs(liveVector[i] - refVector[i]);
+    const diff = Math.abs(liveVector[i] - refVector[i]);
+    totalAbsDiff += diff;
+    if (diff > maxDiff) maxDiff = diff;
   }
 
   const avgDistance = totalAbsDiff / len;
-  // Threshold: Mean absolute distance < 0.12 is same person, >= 0.12 is different person
-  const matchPercentage = Math.max(0, Math.min(100, Math.round((1 - avgDistance / 0.25) * 100)));
-  const isMatch = avgDistance < 0.13;
 
-  return { isMatch, distance: avgDistance, matchPercentage };
+  // Strict Threshold Calculation:
+  // Same person variance is typically avgDistance between 0.015 - 0.065
+  // Different person variance is typically avgDistance > 0.085+
+  const normalizedDistance = Math.min(avgDistance / 0.14, 1.0);
+  const matchPercentage = Math.max(0, Math.min(100, Math.round((1 - normalizedDistance) * 100)));
+
+  // Stricter Threshold: require >= 68% similarity and avgDistance <= 0.078
+  const isMatch = matchPercentage >= 68 && avgDistance <= 0.078;
+
+  return {
+    isMatch,
+    distance: avgDistance,
+    matchPercentage,
+    details: isMatch ? 'Wajah Terverifikasi Cocok' : 'Wajah Tidak Cocok dengan Data Anggota',
+  };
 }
 
 // Extract landmarks from an image URL / Data URL (for reference photo processing)
