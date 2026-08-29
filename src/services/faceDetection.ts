@@ -139,6 +139,114 @@ export function drawFaceLandmarks(
   }
 }
 
+// 3. FACIAL FEATURE VECTOR EXTRACTION (FOR FACE MATCHING)
+// Extracts scale and position invariant geometric ratios from 468 MediaPipe landmarks
+export function extractFacialFeatureVector(landmarks: NormalizedLandmark[]): number[] {
+  if (!landmarks || landmarks.length < 468) return [];
+
+  // Key facial landmark indices in MediaPipe
+  // Eyes: Left (133, 33, 159, 145), Right (362, 263, 386, 374)
+  // Nose: Tip (1), Bridge top (168), Left alar (102), Right alar (331)
+  // Mouth: Left corner (61), Right corner (291), Upper lip (13), Lower lip (14)
+  // Face Edges: Left cheek (234), Right cheek (454), Forehead top (10), Chin bottom (152)
+
+  const leftCheek = landmarks[234];
+  const rightCheek = landmarks[454];
+  const faceWidth = dist2D(leftCheek, rightCheek) || 1;
+
+  const forehead = landmarks[10];
+  const chin = landmarks[152];
+  const faceHeight = dist2D(forehead, chin) || 1;
+
+  const leftEyeInner = landmarks[133];
+  const rightEyeInner = landmarks[362];
+  const eyeDistance = dist2D(leftEyeInner, rightEyeInner);
+
+  const noseTip = landmarks[1];
+  const noseBridge = landmarks[168];
+  const noseLength = dist2D(noseTip, noseBridge);
+
+  const leftMouth = landmarks[61];
+  const rightMouth = landmarks[291];
+  const mouthWidth = dist2D(leftMouth, rightMouth);
+
+  const noseToChin = dist2D(noseTip, chin);
+  const noseToForehead = dist2D(noseTip, forehead);
+  const noseToMouth = dist2D(noseTip, landmarks[13]);
+
+  // Compute scale-invariant ratio vector
+  return [
+    eyeDistance / faceWidth, // 0. Eye distance to cheek width
+    faceWidth / faceHeight, // 1. Face aspect ratio
+    noseLength / faceHeight, // 2. Nose length ratio
+    mouthWidth / faceWidth, // 3. Mouth width ratio
+    noseToChin / faceHeight, // 4. Lower face ratio
+    noseToForehead / faceHeight, // 5. Upper face ratio
+    noseToMouth / faceHeight, // 6. Nose to mouth ratio
+    dist2D(leftEyeInner, noseTip) / faceWidth, // 7. Left eye to nose ratio
+    dist2D(rightEyeInner, noseTip) / faceWidth, // 8. Right eye to nose ratio
+  ];
+}
+
+// 4. COMPARE FACIAL FEATURE VECTORS (ANTI-SPOOFING & PERSON RECOGNITION)
+// Compares live face features against registered reference features
+export function compareFaceLandmarkFeatures(
+  liveVector: number[],
+  refVector: number[]
+): { isMatch: boolean; distance: number; matchPercentage: number } {
+  if (!liveVector || !refVector || liveVector.length === 0 || refVector.length === 0) {
+    return { isMatch: true, distance: 0, matchPercentage: 100 }; // Default pass if no ref vector
+  }
+
+  const len = Math.min(liveVector.length, refVector.length);
+  let totalAbsDiff = 0;
+
+  for (let i = 0; i < len; i++) {
+    totalAbsDiff += Math.abs(liveVector[i] - refVector[i]);
+  }
+
+  const avgDistance = totalAbsDiff / len;
+  // Threshold: Mean absolute distance < 0.12 is same person, >= 0.12 is different person
+  const matchPercentage = Math.max(0, Math.min(100, Math.round((1 - avgDistance / 0.25) * 100)));
+  const isMatch = avgDistance < 0.13;
+
+  return { isMatch, distance: avgDistance, matchPercentage };
+}
+
+// Extract landmarks from an image URL / Data URL (for reference photo processing)
+export async function extractLandmarksFromImage(imageUrl: string): Promise<number[] | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = imageUrl;
+    img.onload = async () => {
+      try {
+        const landmarker = await initFaceLandmarker();
+        if (!landmarker) return resolve(null);
+
+        // Detect landmarks on static image
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || 480;
+        canvas.height = img.naturalHeight || 480;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(null);
+        ctx.drawImage(img, 0, 0);
+
+        // Use detectForVideo with dummy timestamp
+        const res = landmarker.detectForVideo(canvas as any, Date.now());
+        if (res && res.faceLandmarks && res.faceLandmarks.length > 0) {
+          const vec = extractFacialFeatureVector(res.faceLandmarks[0]);
+          return resolve(vec);
+        }
+      } catch (e) {
+        console.warn('Error extracting landmarks from image:', e);
+      }
+      resolve(null);
+    };
+    img.onerror = () => resolve(null);
+  });
+}
+
 // CAPTURE & CROP FACE PHOTO TO BLOB
 export async function captureFacePhotoBlob(
   video: HTMLVideoElement,

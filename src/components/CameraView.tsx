@@ -24,11 +24,16 @@ import {
   calculateEAR,
   drawFaceLandmarks,
   captureFacePhotoBlob,
+  extractFacialFeatureVector,
+  compareFaceLandmarkFeatures,
+  extractLandmarksFromImage,
 } from '../services/faceDetection';
 
 interface CameraViewProps {
-  member: Member;
-  onVerificationSuccess: (photoBlob: Blob) => void;
+  member?: Member;
+  selectedMember?: Member;
+  onVerificationSuccess?: (photoBlob: Blob) => void;
+  onSuccess?: (photoBlob: Blob) => void;
   onCancel: () => void;
 }
 
@@ -38,10 +43,14 @@ const STORAGE_KEY_FACING = 'bintang_remaja_camera_facing';
 const STORAGE_KEY_DEVICE = 'bintang_remaja_camera_device_id';
 
 export const CameraView: React.FC<CameraViewProps> = ({
-  member,
+  member: propMember,
+  selectedMember,
   onVerificationSuccess,
+  onSuccess,
   onCancel,
 }) => {
+  const member = (propMember || selectedMember)!;
+  const notifySuccess = onVerificationSuccess || onSuccess || (() => {});
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -78,9 +87,22 @@ export const CameraView: React.FC<CameraViewProps> = ({
     completed: false,
   });
 
-  // Blink state machine variables
-  const eyeClosedRef = useRef(false);
-  const isCapturingRef = useRef(false);
+  // Reference Face Matching State
+  const isCapturingRef = useRef<boolean>(false);
+  const eyeClosedRef = useRef<boolean>(false);
+  const [refFeatureVector, setRefFeatureVector] = useState<number[] | null>(member.faceLandmarks || null);
+  const [mismatchError, setMismatchError] = useState<string | null>(null);
+
+  // Load reference vector from avatarUrl if faceLandmarks is missing
+  useEffect(() => {
+    if (member.faceLandmarks && member.faceLandmarks.length > 0) {
+      setRefFeatureVector(member.faceLandmarks);
+    } else if (member.avatarUrl) {
+      extractLandmarksFromImage(member.avatarUrl).then((vec) => {
+        if (vec) setRefFeatureVector(vec);
+      });
+    }
+  }, [member]);
 
   // Load available camera devices
   const enumerateCameraDevices = useCallback(async () => {
@@ -240,6 +262,26 @@ export const CameraView: React.FC<CameraViewProps> = ({
           } else {
             // Single face detected!
             const landmarks = landmarksResult.faceLandmarks[0];
+
+            // Anti-Spoofing & Face Match Check against registered member photo
+            if (refFeatureVector && refFeatureVector.length > 0) {
+              const liveVector = extractFacialFeatureVector(landmarks);
+              const { isMatch, matchPercentage } = compareFaceLandmarkFeatures(liveVector, refFeatureVector);
+
+              if (!isMatch) {
+                setMismatchError(`Wajah tidak cocok dengan foto terdaftar milik ${member.name} (Tingkat Kemiripan: ${matchPercentage}%)`);
+                setStatusMessage(`⚠️ WAJAH BERBEDA! Wajah tidak cocok dengan foto ${member.name}`);
+                drawFaceLandmarks(ctx, landmarks, canvas.width, canvas.height, '#EF4444');
+                setProgress((prev) => ({ ...prev, faceDetected: true, singleFace: true }));
+                if (!isCapturingRef.current) {
+                  animFrameId = requestAnimationFrame(analyzeFrame);
+                }
+                return; // BLOCK verification for different person!
+              } else {
+                setMismatchError(null);
+              }
+            }
+
             const strokeColor = filterMode === 'CYBER_GRID' ? '#3B82F6' : '#10B981';
             drawFaceLandmarks(ctx, landmarks, canvas.width, canvas.height, strokeColor);
 
@@ -326,7 +368,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
-      onVerificationSuccess(blob);
+      notifySuccess(blob);
     } catch (e) {
       console.error('Photo capture error:', e);
       setCameraError('Gagal mengambil foto. Silakan coba lagi.');
@@ -356,7 +398,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
-      onVerificationSuccess(blob);
+      notifySuccess(blob);
     } catch (e) {
       setCameraError('Gagal mengambil foto snapshot.');
       isCapturingRef.current = false;
@@ -391,10 +433,13 @@ export const CameraView: React.FC<CameraViewProps> = ({
       className="space-y-4 max-w-md mx-auto pb-24"
     >
       {/* Top Header Card */}
-      <div className="bg-blue-900 p-4 rounded-2xl border border-blue-800 flex items-center justify-between shadow-md text-white">
+      <div className="card-3d p-4 flex items-center justify-between shadow-md text-white border-violet-400/50">
         <div>
-          <span className="text-[11px] font-black text-amber-400 uppercase tracking-widest">Verifikasi Biometrik</span>
-          <h2 className="text-base font-extrabold text-white">{member.name}</h2>
+          <span className="text-[10px] font-black text-amber-300 uppercase tracking-widest flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-amber-400" />
+            VERIFIKASI BIOMETRIK WAJAH
+          </span>
+          <h2 className="text-base font-black text-white">{member.name}</h2>
         </div>
 
         <div className="flex items-center gap-2">
@@ -402,8 +447,8 @@ export const CameraView: React.FC<CameraViewProps> = ({
           {availableDevices.length > 1 && (
             <button
               onClick={() => setShowDevicePicker(!showDevicePicker)}
-              className="p-2 bg-blue-800 hover:bg-blue-700 text-amber-300 rounded-xl border border-blue-700 transition-all text-xs font-bold flex items-center gap-1"
-              title="Pilih Kamera Spasial"
+              className="p-2 btn-3d-dark text-amber-300 rounded-xl transition-all text-xs font-bold flex items-center gap-1"
+              title="Pilih Kamera"
             >
               <Video className="w-4 h-4" />
               <ChevronDown className="w-3 h-3" />
@@ -412,7 +457,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
 
           <button
             onClick={onCancel}
-            className="px-3.5 py-1.5 bg-blue-800 hover:bg-blue-700 text-blue-100 rounded-full text-xs font-bold border border-blue-700 transition-all active:scale-95"
+            className="px-3.5 py-1.5 btn-3d-rose text-white rounded-xl text-xs font-bold transition-all"
           >
             Batal
           </button>
@@ -426,9 +471,9 @@ export const CameraView: React.FC<CameraViewProps> = ({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="bg-white rounded-2xl p-4 border border-slate-200 shadow-lg text-xs space-y-2 text-slate-800"
+            className="card-3d-subtle p-4 text-xs space-y-2 text-white"
           >
-            <div className="font-extrabold text-slate-900 text-xs mb-1">Pilih Sumber Kamera Perangkat:</div>
+            <div className="font-extrabold text-violet-200 text-xs mb-1">Pilih Sumber Kamera:</div>
             <div className="space-y-1.5">
               {availableDevices.map((dev, idx) => (
                 <button
@@ -436,12 +481,12 @@ export const CameraView: React.FC<CameraViewProps> = ({
                   onClick={() => handleSelectDevice(dev.deviceId)}
                   className={`w-full text-left p-2.5 rounded-xl border font-semibold flex items-center justify-between ${
                     selectedDeviceId === dev.deviceId
-                      ? 'bg-blue-50 border-blue-600 text-blue-900 font-extrabold'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                      ? 'bg-violet-900 border-amber-400 text-white font-extrabold'
+                      : 'bg-[#110526] hover:bg-violet-950 border-violet-800 text-violet-300'
                   }`}
                 >
                   <span className="truncate">{dev.label || `Kamera ${idx + 1}`}</span>
-                  {selectedDeviceId === dev.deviceId && <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />}
+                  {selectedDeviceId === dev.deviceId && <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />}
                 </button>
               ))}
             </div>
@@ -449,13 +494,13 @@ export const CameraView: React.FC<CameraViewProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Main Camera Viewport with Phone Mock Shell & Virtual Fill-Light */}
-      <div className={`relative w-[310px] sm:w-[340px] h-[460px] bg-slate-950 rounded-[2.5rem] border-[6px] border-slate-800 shadow-2xl overflow-hidden flex items-center justify-center mx-auto transition-all duration-300 ${
-        isRingLightOn ? 'ring-8 ring-white shadow-[0_0_60px_rgba(255,255,255,0.9)]' : 'ring-4 ring-slate-200'
+      {/* Main Camera Viewport with 3D Cyber Shell & Virtual Fill-Light */}
+      <div className={`relative w-[310px] sm:w-[340px] h-[460px] bg-[#0c0417] rounded-[2.5rem] border-[6px] border-[#220c3d] shadow-[0_12px_0_0_#140526,0_25px_35px_rgba(0,0,0,0.8)] overflow-hidden flex items-center justify-center mx-auto transition-all duration-300 ${
+        isRingLightOn ? 'ring-8 ring-amber-300 shadow-[0_0_60px_rgba(251,191,36,0.8)]' : 'ring-2 ring-violet-500/40'
       }`}>
         {/* Smartphone Camera Notch */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-slate-900 rounded-b-xl z-30 flex items-center justify-center">
-          <div className="w-3 h-3 rounded-full bg-slate-800 border border-slate-700"></div>
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-[#17072c] rounded-b-xl z-30 flex items-center justify-center border-b border-violet-800/60">
+          <div className="w-3 h-3 rounded-full bg-[#0d041a] border border-violet-600/50"></div>
         </div>
 
         {/* Shutter White Flash Overlay */}
@@ -473,12 +518,12 @@ export const CameraView: React.FC<CameraViewProps> = ({
 
         {cameraError ? (
           <div className="p-6 text-center space-y-4 max-w-xs z-20">
-            <AlertTriangle className="w-12 h-12 text-red-500 mx-auto animate-bounce" />
-            <div className="text-sm font-bold text-red-400">{cameraError}</div>
+            <AlertTriangle className="w-12 h-12 text-rose-500 mx-auto animate-bounce" />
+            <div className="text-sm font-bold text-rose-300">{cameraError}</div>
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => startCamera()}
-              className="px-4 py-2 bg-blue-600 text-white text-xs font-extrabold rounded-full flex items-center gap-2 mx-auto hover:bg-blue-500 transition-all shadow-md"
+              className="px-4 py-2 btn-3d-violet text-white text-xs font-extrabold rounded-full flex items-center gap-2 mx-auto"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Coba Lagi Kamera</span>
@@ -505,15 +550,15 @@ export const CameraView: React.FC<CameraViewProps> = ({
               }`}
             />
 
-            {/* Oval Face Alignment Target Frame */}
+            {/* Oval Face Alignment Target Frame with 3D glow */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
               <div
                 className={`relative w-52 h-68 rounded-[50%] border-4 transition-all duration-300 overflow-hidden ${
                   progress.completed
-                    ? 'border-green-500 bg-green-500/15 shadow-[0_0_35px_rgba(34,197,94,0.6)]'
+                    ? 'border-emerald-400 bg-emerald-500/20 shadow-[0_0_40px_rgba(16,185,129,0.8)]'
                     : progress.faceDetected && progress.singleFace
-                    ? 'border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.5)]'
-                    : 'border-amber-400/70 border-dashed shadow-[0_0_15px_rgba(245,158,11,0.3)]'
+                    ? 'border-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.6)]'
+                    : 'border-violet-400/70 border-dashed shadow-[0_0_20px_rgba(168,85,247,0.4)]'
                 }`}
               >
                 {/* Laser Biometric Scan Line Animation */}
@@ -521,7 +566,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
                   <motion.div
                     animate={{ top: ['0%', '100%', '0%'] }}
                     transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
-                    className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_12px_#FBBF24] z-20"
+                    className="absolute left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-amber-300 to-transparent shadow-[0_0_15px_#FBBF24] z-20"
                   />
                 )}
               </div>
@@ -530,41 +575,47 @@ export const CameraView: React.FC<CameraViewProps> = ({
             {/* Floating Top Status Badge Prompt */}
             <div className="absolute top-8 inset-x-4 flex justify-center z-20">
               <motion.div
-                key={statusMessage}
+                key={mismatchError || statusMessage}
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={`px-4 py-2 rounded-full backdrop-blur-md border text-xs font-extrabold text-center shadow-lg transition-all ${
-                  progress.completed
-                    ? 'bg-green-600 text-white border-green-400'
-                    : 'bg-blue-950/90 text-amber-300 border-blue-800'
+                  mismatchError
+                    ? 'bg-rose-950/90 text-rose-300 border-rose-500 shadow-rose-950/50'
+                    : progress.completed
+                    ? 'bg-emerald-950/90 text-emerald-300 border-emerald-400'
+                    : 'bg-[#15072d]/90 text-amber-300 border-violet-600/80 shadow-[0_4px_12px_rgba(0,0,0,0.5)]'
                 }`}
               >
-                {currentTask === 'SMILE' && <Smile className="w-4 h-4 inline mr-1.5 text-amber-300" />}
-                {currentTask === 'BLINK' && <Eye className="w-4 h-4 inline mr-1.5 text-amber-300" />}
-                <span>{statusMessage}</span>
+                {mismatchError ? (
+                  <AlertTriangle className="w-4 h-4 inline mr-1.5 text-rose-400 shrink-0" />
+                ) : (
+                  <>
+                    {currentTask === 'SMILE' && <Smile className="w-4 h-4 inline mr-1.5 text-amber-300" />}
+                    {currentTask === 'BLINK' && <Eye className="w-4 h-4 inline mr-1.5 text-amber-300" />}
+                  </>
+                )}
+                <span>{mismatchError || statusMessage}</span>
               </motion.div>
             </div>
 
             {/* Right Side HUD Controls: Camera Flip & Ring Light */}
             <div className="absolute right-3 top-20 z-30 flex flex-col gap-2">
-              {/* Front / Back Camera Switch Button */}
               <motion.button
                 whileTap={{ scale: 0.85, rotate: 180 }}
                 onClick={handleToggleFacingMode}
-                className="w-10 h-10 rounded-full bg-blue-950/80 backdrop-blur-md border border-blue-700/80 text-amber-400 flex items-center justify-center shadow-lg hover:bg-blue-900 transition-all"
+                className="w-10 h-10 rounded-2xl bg-violet-950/90 backdrop-blur-md border border-violet-500/60 text-amber-300 flex items-center justify-center shadow-lg hover:bg-violet-900 transition-all"
                 title={`Ganti ke Kamera ${facingMode === 'user' ? 'Belakang' : 'Depan'}`}
               >
                 <SwitchCamera className="w-5 h-5" />
               </motion.button>
 
-              {/* Virtual Ring Light / Fill Frame Toggle */}
               <motion.button
                 whileTap={{ scale: 0.85 }}
                 onClick={() => setIsRingLightOn(!isRingLightOn)}
-                className={`w-10 h-10 rounded-full backdrop-blur-md border flex items-center justify-center shadow-lg transition-all ${
+                className={`w-10 h-10 rounded-2xl backdrop-blur-md border flex items-center justify-center shadow-lg transition-all ${
                   isRingLightOn
-                    ? 'bg-white text-slate-900 border-white ring-2 ring-amber-400'
-                    : 'bg-blue-950/80 border-blue-700/80 text-blue-200 hover:text-white'
+                    ? 'bg-amber-400 text-purple-950 border-white ring-2 ring-amber-300'
+                    : 'bg-violet-950/90 border-violet-500/60 text-violet-200 hover:text-white'
                 }`}
                 title="Toggle Ring Light Lampu Layar"
               >
@@ -573,7 +624,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
             </div>
 
             {/* Bottom HUD Camera Mode Info Tag */}
-            <div className="absolute bottom-3 left-4 right-4 z-20 flex items-center justify-between text-[10px] text-blue-200 font-mono bg-blue-950/70 backdrop-blur-md px-3 py-1 rounded-full border border-blue-800/80">
+            <div className="absolute bottom-3 left-4 right-4 z-20 flex items-center justify-between text-[10px] text-violet-200 font-mono bg-[#14062a]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-violet-700/80">
               <span className="flex items-center gap-1 font-bold text-amber-400">
                 <Zap className="w-3 h-3" />
                 <span>{facingMode === 'user' ? 'Depan' : 'Belakang'}</span>
@@ -584,14 +635,14 @@ export const CameraView: React.FC<CameraViewProps> = ({
         )}
       </div>
 
-      {/* Camera Visual Effects Filter Selector Bar */}
-      <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm space-y-2">
-        <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-600 px-1">
-          <span className="flex items-center gap-1.5 text-blue-900">
-            <Sliders className="w-3.5 h-3.5 text-amber-500" />
+      {/* Camera Visual Effects Filter Selector Bar in 3D Card */}
+      <div className="card-3d-subtle p-3 space-y-2 text-white">
+        <div className="flex items-center justify-between text-[11px] font-extrabold text-violet-300 px-1">
+          <span className="flex items-center gap-1.5 text-white">
+            <Sliders className="w-3.5 h-3.5 text-amber-400" />
             <span>Efek Filter Kamera</span>
           </span>
-          <span className="text-slate-400 font-medium">Sentuh untuk mengubah</span>
+          <span className="text-violet-400 font-medium text-[10px]">Pilih gaya tampilan</span>
         </div>
 
         <div className="grid grid-cols-5 gap-1.5 text-[10px] font-bold">
@@ -613,11 +664,11 @@ export const CameraView: React.FC<CameraViewProps> = ({
                 onClick={() => setFilterMode(filter.id)}
                 className={`py-2 px-1 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${
                   isActive
-                    ? 'bg-blue-900 text-amber-400 border-blue-800 shadow-sm font-extrabold'
-                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
+                    ? 'btn-3d-violet text-amber-300 shadow-md font-black'
+                    : 'btn-3d-dark text-violet-300'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400' : 'text-slate-500'}`} />
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-300' : 'text-violet-400'}`} />
                 <span>{filter.label}</span>
               </motion.button>
             );
@@ -625,10 +676,10 @@ export const CameraView: React.FC<CameraViewProps> = ({
         </div>
       </div>
 
-      {/* Liveness Verification Progress Checklist */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-        <h4 className="text-xs font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
-          <ShieldCheck className="w-4 h-4 text-blue-600" />
+      {/* Liveness Verification Progress Checklist in 3D Card */}
+      <div className="card-3d-subtle p-4 space-y-3 text-white">
+        <h4 className="text-xs font-black text-violet-300 uppercase tracking-wider flex items-center gap-1.5">
+          <ShieldCheck className="w-4 h-4 text-amber-400" />
           <span>Indikator Verifikasi Biometrik</span>
         </h4>
 
@@ -636,13 +687,13 @@ export const CameraView: React.FC<CameraViewProps> = ({
           <div
             className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
               progress.faceDetected && progress.singleFace
-                ? 'bg-green-50 border-green-200 text-green-700'
-                : 'bg-slate-50 border-slate-200 text-slate-400'
+                ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
+                : 'bg-[#110526] border-violet-800/60 text-violet-500'
             }`}
           >
             <CheckCircle2
               className={`w-4 h-4 ${
-                progress.faceDetected && progress.singleFace ? 'text-green-600' : 'text-slate-300'
+                progress.faceDetected && progress.singleFace ? 'text-emerald-400' : 'text-violet-700'
               }`}
             />
             <span>Wajah Terdeteksi</span>
@@ -651,12 +702,12 @@ export const CameraView: React.FC<CameraViewProps> = ({
           <div
             className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
               progress.smileDetected
-                ? 'bg-green-50 border-green-200 text-green-700'
-                : 'bg-slate-50 border-slate-200 text-slate-400'
+                ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
+                : 'bg-[#110526] border-violet-800/60 text-violet-500'
             }`}
           >
             <CheckCircle2
-              className={`w-4 h-4 ${progress.smileDetected ? 'text-green-600' : 'text-slate-300'}`}
+              className={`w-4 h-4 ${progress.smileDetected ? 'text-emerald-400' : 'text-violet-700'}`}
             />
             <span>Senyum Terdeteksi</span>
           </div>
@@ -664,12 +715,12 @@ export const CameraView: React.FC<CameraViewProps> = ({
           <div
             className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
               progress.blinkDetected
-                ? 'bg-green-50 border-green-200 text-green-700'
-                : 'bg-slate-50 border-slate-200 text-slate-400'
+                ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
+                : 'bg-[#110526] border-violet-800/60 text-violet-500'
             }`}
           >
             <CheckCircle2
-              className={`w-4 h-4 ${progress.blinkDetected ? 'text-green-600' : 'text-slate-300'}`}
+              className={`w-4 h-4 ${progress.blinkDetected ? 'text-emerald-400' : 'text-violet-700'}`}
             />
             <span>Kedipan Terdeteksi</span>
           </div>
@@ -677,12 +728,12 @@ export const CameraView: React.FC<CameraViewProps> = ({
           <div
             className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
               progress.completed
-                ? 'bg-green-50 border-green-200 text-green-700'
-                : 'bg-slate-50 border-slate-200 text-slate-400'
+                ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
+                : 'bg-[#110526] border-violet-800/60 text-violet-500'
             }`}
           >
             <CheckCircle2
-              className={`w-4 h-4 ${progress.completed ? 'text-green-600' : 'text-slate-300'}`}
+              className={`w-4 h-4 ${progress.completed ? 'text-emerald-400' : 'text-violet-700'}`}
             />
             <span>Verifikasi Berhasil</span>
           </div>
@@ -690,13 +741,13 @@ export const CameraView: React.FC<CameraViewProps> = ({
 
         {/* Fallback Manual Verification Button */}
         {isCameraReady && !progress.completed && (
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-[11px] text-slate-500 font-medium">Cahaya redup / silau?</span>
+          <div className="pt-2 border-t border-violet-800/60 flex items-center justify-between text-xs">
+            <span className="text-[11px] text-violet-400 font-medium">Cahaya redup?</span>
             <button
               onClick={handleSimulatedVerification}
-              className="text-xs font-extrabold text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+              className="text-xs font-black text-amber-300 hover:text-amber-200 underline flex items-center gap-1"
             >
-              <span>Verifikasi Manual & Ambil Foto</span>
+              <span>Verifikasi Manual & Jepret</span>
             </button>
           </div>
         )}

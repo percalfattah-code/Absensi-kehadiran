@@ -1,21 +1,47 @@
-import React, { useState } from 'react';
-import { Users, Search, Plus, Edit2, Trash2, UserCheck, ShieldCheck, History, X, Check } from 'lucide-react';
-import { Member, AttendanceRecord } from '../types';
+import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  Users,
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
+  UserCheck,
+  ShieldCheck,
+  History,
+  X,
+  Check,
+  Camera,
+  Upload,
+  Image as ImageIcon,
+  Lock,
+  Sparkles,
+  AlertTriangle,
+  Fingerprint,
+} from 'lucide-react';
+import { Member, AttendanceRecord, RoleMode } from '../types';
+import { extractLandmarksFromImage, captureFacePhotoBlob } from '../services/faceDetection';
 
 interface MemberManagementProps {
   members: Member[];
   records: AttendanceRecord[];
+  roleMode: RoleMode;
   onAddMember: (member: Omit<Member, 'id' | 'createdAt'>) => Promise<void>;
   onUpdateMember: (member: Member) => Promise<void>;
   onDeleteMember: (id: string) => Promise<void>;
+  onClearAllMembers?: () => Promise<void>;
+  onOpenAdminLogin?: () => void;
 }
 
 export const MemberManagement: React.FC<MemberManagementProps> = ({
   members,
   records,
+  roleMode,
   onAddMember,
   onUpdateMember,
   onDeleteMember,
+  onClearAllMembers,
+  onOpenAdminLogin,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,7 +50,14 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
   // Form fields
   const [nameInput, setNameInput] = useState('');
   const [memberNumInput, setMemberNumInput] = useState('');
+  const [avatarUrlInput, setAvatarUrlInput] = useState<string>('');
+  const [faceLandmarksInput, setFaceLandmarksInput] = useState<number[] | undefined>(undefined);
   const [isActiveInput, setIsActiveInput] = useState(true);
+
+  // Camera snapshot state
+  const [isCapturingCam, setIsCapturingCam] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // History modal state
   const [historyMember, setHistoryMember] = useState<Member | null>(null);
@@ -38,20 +71,90 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
   const handleOpenAdd = () => {
     setEditingMember(null);
     setNameInput('');
-    setMemberNumInput(`BR-${String(members.length + 1).padStart(3, '0')}`);
+    setMemberNumInput(`KTR-${String(members.length + 1).padStart(3, '0')}`);
+    setAvatarUrlInput('');
+    setFaceLandmarksInput(undefined);
     setIsActiveInput(true);
+    setIsCapturingCam(false);
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (member: Member) => {
-    setEditingMember(member);
-    setNameInput(member.name);
-    setMemberNumInput(member.memberNumber || '');
-    setIsActiveInput(member.isActive);
+  const handleOpenEdit = (m: Member) => {
+    setEditingMember(m);
+    setNameInput(m.name);
+    setMemberNumInput(m.memberNumber || '');
+    setAvatarUrlInput(m.avatarUrl || '');
+    setFaceLandmarksInput(m.faceLandmarks);
+    setIsActiveInput(m.isActive);
+    setIsCapturingCam(false);
     setIsModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Start live webcam for snapshot
+  const startCamera = async () => {
+    setIsCapturingCam(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } },
+        audio: false,
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (err) {
+      alert('Tidak dapat mengakses kamera untuk foto anggota.');
+      setIsCapturingCam(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsCapturingCam(false);
+  };
+
+  const takeSnapshot = async () => {
+    if (!videoRef.current) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 300;
+    canvas.height = 300;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(videoRef.current, 0, 0, 300, 300);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      setAvatarUrlInput(dataUrl);
+
+      // Extract facial landmarks for biometric verification
+      const landmarks = await extractLandmarksFromImage(dataUrl);
+      if (landmarks) {
+        setFaceLandmarksInput(landmarks);
+      }
+    }
+    stopCamera();
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const result = event.target?.result as string;
+      setAvatarUrlInput(result);
+
+      const landmarks = await extractLandmarksFromImage(result);
+      if (landmarks) {
+        setFaceLandmarksInput(landmarks);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nameInput.trim()) return;
 
@@ -60,254 +163,386 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
         ...editingMember,
         name: nameInput.trim(),
         memberNumber: memberNumInput.trim(),
+        avatarUrl: avatarUrlInput || undefined,
+        faceLandmarks: faceLandmarksInput,
         isActive: isActiveInput,
       });
     } else {
       await onAddMember({
         name: nameInput.trim(),
         memberNumber: memberNumInput.trim(),
+        avatarUrl: avatarUrlInput || undefined,
+        faceLandmarks: faceLandmarksInput,
         isActive: isActiveInput,
       });
     }
-
+    stopCamera();
     setIsModalOpen(false);
   };
 
-  const getMemberRecords = (memberId: string) => {
-    return records.filter((r) => r.memberId === memberId);
-  };
-
   return (
-    <div className="space-y-5 pb-24">
-      {/* Header Banner */}
-      <div className="bg-blue-900 p-5 rounded-3xl border border-blue-800 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-white">
+    <div className="space-y-6 pb-24">
+      {/* 3D HERO HEADER */}
+      <div className="card-3d p-6 relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-violet-300 to-transparent" />
+        
         <div>
-          <span className="text-xs font-black text-amber-400 uppercase tracking-widest">Keanggotaan</span>
-          <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-            <Users className="w-6 h-6 text-amber-400" />
-            <span>Daftar Anggota Karang Taruna</span>
-          </h2>
-          <p className="text-xs text-blue-200 mt-1 font-medium">
-            Total {members.length} anggota terdaftar dalam sistem Bintang Remaja
+          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-violet-950 text-violet-300 border border-violet-500/40 text-[10px] font-black uppercase tracking-wider mb-1">
+            <Users className="w-3.5 h-3.5 text-amber-300" />
+            <span>DATABASE ANGGOTA KARANG TARUNA</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-white">Kelola Data Anggota</h2>
+          <p className="text-xs text-violet-200/80 mt-1">
+            Daftar profil, nomor induk & foto referensi biometrik wajah anggota.
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAdd}
-          className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-blue-950 rounded-full text-xs font-extrabold flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
-        >
-          <Plus className="w-4 h-4 text-blue-950" />
-          <span>Tambah Anggota</span>
-        </button>
+        {roleMode === 'ADMIN' && (
+          <button
+            onClick={handleOpenAdd}
+            className="px-5 py-3.5 btn-3d-amber text-purple-950 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Tambah Anggota Baru</span>
+          </button>
+        )}
       </div>
 
-      {/* Search Input Box */}
-      <div className="relative">
-        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Cari nama atau nomor anggota..."
-          className="w-full bg-white text-slate-900 placeholder-slate-400 text-sm pl-10 pr-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-sm transition-all"
-        />
+      {/* 3D SEARCH & FILTER BAR */}
+      <div className="card-3d-subtle p-4 space-y-3">
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-violet-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari nama anggota atau nomor induk..."
+            className="w-full bg-[#110526] text-white placeholder-violet-400/60 text-xs pl-10 pr-4 py-3 rounded-xl border border-violet-700/60 focus:outline-none focus:border-violet-400 transition-all shadow-inner"
+          />
+        </div>
       </div>
 
-      {/* Members Grid / Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* 3D MEMBERS GRID LIST */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredMembers.length === 0 ? (
-          <div className="col-span-full bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500 text-xs shadow-sm">
-            Tidak ada anggota ditemukan dengan pencarian "{searchQuery}".
+          <div className="col-span-full text-center py-12 text-xs text-violet-300/70 card-3d p-6">
+            Tidak ada anggota yang cocok dengan pencarian "{searchQuery}".
           </div>
         ) : (
           filteredMembers.map((member) => {
-            const memberRecords = getMemberRecords(member.id);
+            const memberRecords = records.filter((r) => r.memberId === member.id);
+
             return (
               <div
                 key={member.id}
-                className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3 flex flex-col justify-between"
+                className="card-3d-subtle p-4 flex flex-col justify-between space-y-4 hover:border-violet-400/50 transition-all"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-900 text-amber-400 font-extrabold text-sm flex items-center justify-center border border-blue-800">
-                      {member.name.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                        <span>{member.name}</span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 font-mono">
-                        {member.memberNumber || 'Tanpa Nomor'}
-                      </div>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-14 h-14 rounded-2xl overflow-hidden bg-[#100522] border-2 border-violet-600/40 shrink-0 flex items-center justify-center font-black text-violet-200 text-sm shadow-md">
+                    {member.avatarUrl ? (
+                      <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" />
+                    ) : (
+                      member.name.substring(0, 2).toUpperCase()
+                    )}
                   </div>
 
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                      member.isActive
-                        ? 'bg-green-100 text-green-700 border border-green-200'
-                        : 'bg-red-100 text-red-700 border border-red-200'
-                    }`}
-                  >
-                    {member.isActive ? 'Aktif' : 'Nonaktif'}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-extrabold text-sm text-white truncate">{member.name}</h4>
+                      <span className={`px-2 py-0.5 text-[9px] font-black rounded-full border ${
+                        member.isActive
+                          ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
+                          : 'bg-rose-950/80 text-rose-300 border-rose-500/40'
+                      }`}>
+                        {member.isActive ? 'AKTIF' : 'NON-AKTIF'}
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-violet-300 font-mono mt-0.5">
+                      {member.memberNumber || 'Tanpa ID'}
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-2">
+                      {member.avatarUrl ? (
+                        <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-500/30 flex items-center gap-1">
+                          <Fingerprint className="w-3 h-3" /> Biometrik Siap
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium text-amber-300/80 bg-amber-950/60 px-2 py-0.5 rounded-lg border border-amber-500/30">
+                          Foto Belum Ada
+                        </span>
+                      )}
+                      <span className="text-[10px] text-violet-400">
+                        {memberRecords.length}x Absen
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <button
-                    onClick={() => setHistoryMember(member)}
-                    className="text-slate-500 hover:text-blue-600 font-semibold flex items-center gap-1 transition-colors"
-                  >
-                    <History className="w-3.5 h-3.5 text-blue-600" />
-                    <span>{memberRecords.length} kali hadir</span>
-                  </button>
+                {roleMode === 'ADMIN' && (
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-violet-800/60 text-xs">
+                    <button
+                      onClick={() => setHistoryMember(member)}
+                      className="px-3 py-1.5 btn-3d-dark text-violet-200 rounded-xl font-bold flex items-center gap-1 text-[11px]"
+                    >
+                      <History className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Riwayat</span>
+                    </button>
 
-                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleOpenEdit(member)}
-                      className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-all"
-                      title="Edit Anggota"
+                      className="px-3 py-1.5 btn-3d-dark text-violet-200 rounded-xl font-bold flex items-center gap-1 text-[11px]"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
+                      <Edit2 className="w-3.5 h-3.5 text-violet-400" />
+                      <span>Edit</span>
                     </button>
+
                     <button
                       onClick={() => {
-                        if (confirm(`Hapus anggota "${member.name}"?`)) {
+                        if (confirm(`Yakin ingin menghapus anggota ${member.name}?`)) {
                           onDeleteMember(member.id);
                         }
                       }}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-slate-100 rounded-lg transition-all"
-                      title="Hapus Anggota"
+                      className="px-3 py-1.5 btn-3d-rose text-white rounded-xl font-bold flex items-center gap-1 text-[11px]"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                </div>
+                )}
               </div>
             );
           })
         )}
       </div>
 
-      {/* Add / Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 max-w-md w-full shadow-2xl space-y-4 text-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-extrabold text-slate-900">
-                {editingMember ? 'Edit Data Anggota' : 'Tambah Anggota Baru'}
-              </h3>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-800 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Nama Lengkap *</label>
-                <input
-                  type="text"
-                  required
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  placeholder="Contoh: Ahmad Fauzan"
-                  className="w-full bg-slate-50 text-slate-900 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:bg-white text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Nomor Anggota (Opsional)</label>
-                <input
-                  type="text"
-                  value={memberNumInput}
-                  onChange={(e) => setMemberNumInput(e.target.value)}
-                  placeholder="Contoh: BR-001"
-                  className="w-full bg-slate-50 text-slate-900 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:bg-white text-sm"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={isActiveInput}
-                  onChange={(e) => setIsActiveInput(e.target.checked)}
-                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-slate-50 border-slate-300"
-                />
-                <label htmlFor="isActive" className="text-slate-700 font-bold">
-                  Status Anggota Aktif
-                </label>
-              </div>
-
-              <div className="flex items-center gap-2 pt-3">
+      {/* 3D MODAL: TAMBAH / EDIT ANGGOTA */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="card-3d p-6 max-w-lg w-full space-y-5 text-white max-h-[90vh] overflow-y-auto scrollbar-thin"
+            >
+              <div className="flex items-center justify-between border-b border-violet-800/80 pb-3">
+                <h3 className="text-lg font-black text-white">
+                  {editingMember ? 'Edit Profil Anggota' : 'Tambah Anggota Baru'}
+                </h3>
                 <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="w-1/2 py-2.5 bg-slate-100 text-slate-700 rounded-full font-bold hover:bg-slate-200"
+                  onClick={() => {
+                    stopCamera();
+                    setIsModalOpen(false);
+                  }}
+                  className="p-1.5 rounded-xl bg-violet-950 text-violet-400 hover:text-white"
                 >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="w-1/2 py-2.5 bg-blue-600 text-white rounded-full font-extrabold hover:bg-blue-700 shadow-md"
-                >
-                  Simpan
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleSave} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-violet-300 font-extrabold mb-1">Nama Lengkap *</label>
+                  <input
+                    type="text"
+                    required
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="Contoh: Muhammad Rizky"
+                    className="w-full bg-[#110526] text-white p-3 rounded-xl border border-violet-700/60 focus:outline-none focus:border-violet-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-violet-300 font-extrabold mb-1">Nomor Induk Anggota</label>
+                  <input
+                    type="text"
+                    value={memberNumInput}
+                    onChange={(e) => setMemberNumInput(e.target.value)}
+                    placeholder="Contoh: KTR-001"
+                    className="w-full bg-[#110526] text-white p-3 rounded-xl border border-violet-700/60 focus:outline-none focus:border-violet-400 font-mono"
+                  />
+                </div>
+
+                {/* 3D Foto Referensi Biometrik Wajah */}
+                <div className="space-y-2 pt-1">
+                  <label className="block text-violet-300 font-extrabold">Foto Referensi Wajah Biometrik</label>
+                  
+                  {isCapturingCam ? (
+                    <div className="space-y-3 bg-[#110526] p-4 rounded-2xl border border-violet-700/60 text-center">
+                      <div className="relative w-48 h-48 mx-auto rounded-2xl overflow-hidden border-2 border-amber-400 shadow-md">
+                        <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+                      </div>
+                      <div className="flex justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={takeSnapshot}
+                          className="px-4 py-2 btn-3d-amber text-purple-950 font-black rounded-xl"
+                        >
+                          Ambil Jepretan
+                        </button>
+                        <button
+                          type="button"
+                          onClick={stopCamera}
+                          className="px-4 py-2 btn-3d-dark text-violet-300 rounded-xl font-bold"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-4 bg-[#110526] p-3.5 rounded-2xl border border-violet-700/60">
+                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-violet-950 border border-violet-700 shrink-0 flex items-center justify-center">
+                        {avatarUrlInput ? (
+                          <img src={avatarUrlInput} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="w-6 h-6 text-violet-500" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 space-y-2">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={startCamera}
+                            className="px-3 py-2 btn-3d-violet text-white font-bold rounded-xl flex items-center gap-1.5 text-[11px]"
+                          >
+                            <Camera className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Kamera Live</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-3 py-2 btn-3d-dark text-violet-200 font-bold rounded-xl flex items-center gap-1.5 text-[11px]"
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Upload File</span>
+                          </button>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                          />
+                        </div>
+
+                        {avatarUrlInput && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAvatarUrlInput('');
+                              setFaceLandmarksInput(undefined);
+                            }}
+                            className="text-[10px] text-rose-400 hover:underline"
+                          >
+                            Hapus Foto
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="statusActive"
+                    checked={isActiveInput}
+                    onChange={(e) => setIsActiveInput(e.target.checked)}
+                    className="rounded text-violet-600 bg-[#110526] border-violet-700"
+                  />
+                  <label htmlFor="statusActive" className="text-violet-300 font-medium cursor-pointer">
+                    Anggota Aktif (Dapat Melakukan Absensi)
+                  </label>
+                </div>
+
+                <div className="flex gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopCamera();
+                      setIsModalOpen(false);
+                    }}
+                    className="w-1/2 py-3 btn-3d-dark text-violet-300 rounded-xl font-bold"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-1/2 py-3 btn-3d-amber text-purple-950 font-black rounded-xl uppercase tracking-wider"
+                  >
+                    Simpan Data
+                  </button>
+                </div>
+              </form>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
-      {/* History Modal */}
-      {historyMember && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 max-w-md w-full shadow-2xl space-y-4 text-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-base font-extrabold text-slate-900">Riwayat Kehadiran</h3>
-                <p className="text-xs text-blue-600 font-bold">{historyMember.name}</p>
+      {/* 3D MODAL: RIWAYAT ANGGOTA */}
+      <AnimatePresence>
+        {historyMember && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="card-3d p-6 max-w-md w-full space-y-4 text-white max-h-[85vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between border-b border-violet-800/80 pb-3">
+                <div>
+                  <h3 className="font-black text-base text-white">{historyMember.name}</h3>
+                  <p className="text-[11px] text-violet-300 font-mono">{historyMember.memberNumber}</p>
+                </div>
+                <button
+                  onClick={() => setHistoryMember(null)}
+                  className="p-1.5 rounded-xl bg-violet-950 text-violet-400"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
+
+              <div className="space-y-2">
+                <span className="text-xs font-black text-violet-300 uppercase tracking-wider">
+                  Log Kehadiran ({records.filter((r) => r.memberId === historyMember.id).length} kali)
+                </span>
+                <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                  {records.filter((r) => r.memberId === historyMember.id).length === 0 ? (
+                    <div className="text-center py-6 text-xs text-violet-400">Belum ada riwayat absensi.</div>
+                  ) : (
+                    records
+                      .filter((r) => r.memberId === historyMember.id)
+                      .map((rec) => (
+                        <div
+                          key={rec.id}
+                          className="p-3 bg-[#110526] rounded-xl border border-violet-800/60 flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <div className="font-bold text-white">{rec.date}</div>
+                            <div className="text-[10px] text-violet-400 font-mono">{rec.time} WIB</div>
+                          </div>
+                          <span className="px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-500/40 rounded-lg text-[10px] font-black">
+                            {rec.status}
+                          </span>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+
               <button
                 onClick={() => setHistoryMember(null)}
-                className="p-1 text-slate-400 hover:text-slate-800 rounded-lg"
+                className="w-full py-3 btn-3d-dark text-violet-200 rounded-xl font-bold text-xs"
               >
-                <X className="w-5 h-5" />
+                Tutup
               </button>
-            </div>
-
-            <div className="max-h-60 overflow-y-auto space-y-2 text-xs">
-              {getMemberRecords(historyMember.id).length === 0 ? (
-                <div className="text-center py-6 text-slate-500">Belum ada catatan riwayat absensi.</div>
-              ) : (
-                getMemberRecords(historyMember.id).map((rec) => (
-                  <div
-                    key={rec.id}
-                    className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="font-bold text-slate-800">{rec.date}</div>
-                      <div className="text-slate-500 text-[11px]">{rec.time} WIB</div>
-                    </div>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                        rec.status === 'HADIR'
-                          ? 'bg-green-100 text-green-700 border border-green-200'
-                          : 'bg-amber-100 text-amber-700 border border-amber-200'
-                      }`}
-                    >
-                      {rec.status}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 };

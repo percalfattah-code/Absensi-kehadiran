@@ -1,17 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, UserCheck, Star, Camera, AlertCircle, Clock, Plus, CheckCircle2 } from 'lucide-react';
-import { Member, AttendanceRecord, AttendanceSession } from '../types';
+import { Search, UserCheck, Star, Camera, AlertCircle, Clock, Plus, CheckCircle2, ShieldCheck, Sparkles, UserX } from 'lucide-react';
+import { Member, AttendanceRecord, AttendanceSession, RoleMode } from '../types';
 
 interface MemberSelectProps {
   members: Member[];
   todayRecords: AttendanceRecord[];
-  session: AttendanceSession;
+  session?: AttendanceSession | null;
   selectedMember: Member | null;
   onSelectMember: (member: Member) => void;
-  onStartAttendance: () => void;
-  onAddNewMemberClick: () => void;
-  countdownText: string;
+  onProceedToCamera?: () => void;
+  onStartAttendance?: () => void;
+  onAddNewMemberClick?: () => void;
+  isSessionOpen?: boolean;
+  roleMode?: RoleMode;
+  countdownText?: string;
 }
 
 export const MemberSelect: React.FC<MemberSelectProps> = ({
@@ -20,11 +23,19 @@ export const MemberSelect: React.FC<MemberSelectProps> = ({
   session,
   selectedMember,
   onSelectMember,
+  onProceedToCamera,
   onStartAttendance,
   onAddNewMemberClick,
+  isSessionOpen,
+  roleMode = 'MEMBER',
   countdownText,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handleStart = () => {
+    if (onProceedToCamera) onProceedToCamera();
+    else if (onStartAttendance) onStartAttendance();
+  };
 
   // Map today's attendance records by member ID
   const todayRecordMap = useMemo(() => {
@@ -45,76 +56,90 @@ export const MemberSelect: React.FC<MemberSelectProps> = ({
 
   // Check if currently selected member has already attended
   const selectedAlreadyAttendedRecord = selectedMember ? todayRecordMap.get(selectedMember.id) : null;
+  const isOpen = session?.isOpen ?? isSessionOpen ?? false;
 
   return (
-    <div className="space-y-5 pb-20">
-      {/* Hero Welcome Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-blue-900 p-6 border border-blue-800 shadow-md text-center text-white">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-400 text-blue-950 text-xs font-extrabold mb-3 shadow">
-          <Star className="w-3.5 h-3.5 fill-blue-950" />
-          <span>Sistem Absensi Kehadiran Karang Taruna</span>
-        </div>
+    <div className="space-y-6 pb-20">
+      {/* 3D HERO CARD: SELECTION BANNER */}
+      <div className="card-3d p-6 text-center text-white relative overflow-hidden">
+        {/* Glow & light streaks */}
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-violet-300 to-transparent" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-violet-500/20 rounded-full blur-3xl" />
 
-        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-          Selamat Datang di Bintang Remaja
-        </h2>
-        <p className="mt-2 text-sm text-blue-200 max-w-lg mx-auto">
-          Pilih nama Anda di bawah ini untuk memulai absensi kehadiran dengan verifikasi wajah real-time.
-        </p>
-
-        {/* Session Status Banner */}
-        <div className="mt-5 inline-flex flex-wrap items-center justify-center gap-4 bg-blue-950/60 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-blue-800 text-xs">
-          <div className="flex items-center gap-2 text-blue-100">
-            <Clock className="w-4 h-4 text-amber-400" />
-            <span>Sesi: <b>{session.startTime} - {session.endTime} WIB</b></span>
+        <div className="relative z-10 space-y-3">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-violet-950/90 border border-violet-400/40 text-amber-300 text-xs font-black uppercase tracking-wider shadow-md">
+            <Star className="w-3.5 h-3.5 fill-amber-300 animate-spin" style={{ animationDuration: '10s' }} />
+            <span>Portal Absensi Biometrik Wajah</span>
           </div>
 
-          <div className="h-3 w-[1px] bg-blue-800 hidden sm:block"></div>
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-[0_4px_10px_rgba(139,92,246,0.5)]">
+            Pilih Nama & Mulai Absensi
+          </h2>
+          <p className="text-xs sm:text-sm text-violet-200/80 max-w-lg mx-auto leading-relaxed">
+            Tekan nama Anda dari daftar anggota Karang Taruna di bawah ini, lalu arahkan wajah ke kamera untuk verifikasi biometrik.
+          </p>
 
-          <div className="flex items-center gap-1.5 font-mono text-amber-400 font-bold">
-            <span>Sisa Waktu:</span>
-            <span className="bg-amber-400/20 px-2 py-0.5 rounded border border-amber-400/30 text-amber-300">{countdownText}</span>
-          </div>
+          {/* Sesi Info Pill */}
+          {session && (
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3 text-xs">
+              <div className="flex items-center gap-2 bg-violet-950/80 px-3.5 py-1.5 rounded-xl border border-violet-700/60 text-violet-200">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span>Jam Sesi: <b>{session.startTime} - {session.endTime} WIB</b></span>
+              </div>
+
+              {countdownText && (
+                <div className="flex items-center gap-1.5 bg-violet-950/80 px-3.5 py-1.5 rounded-xl border border-amber-400/40 text-amber-300 font-mono font-bold">
+                  <span>Sisa:</span>
+                  <span className="text-amber-400 font-black">{countdownText}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Member Selection Section */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+      {/* 3D SELECTION PANEL */}
+      <div className="card-3d-subtle p-5 sm:p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
-              <UserCheck className="w-5 h-5 text-blue-600" />
-              1. Pilih Nama Anggota
+            <h3 className="text-base font-black text-white flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-amber-400" />
+              <span>1. Temukan Nama Anda</span>
             </h3>
-            <p className="text-xs text-slate-500">Cari dan tekan nama Anda dari daftar anggota Karang Taruna</p>
+            <p className="text-xs text-violet-300/70">
+              Total {members.length} anggota terdaftar dalam database
+            </p>
           </div>
 
-          <button
-            onClick={onAddNewMemberClick}
-            className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-blue-700 rounded-xl text-xs font-bold border border-slate-200 transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Tambah Anggota Baru</span>
-          </button>
+          {roleMode === 'ADMIN' && onAddNewMemberClick && (
+            <button
+              onClick={onAddNewMemberClick}
+              className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-2 btn-3d-amber text-purple-950 rounded-xl text-xs font-black transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tambah Anggota</span>
+            </button>
+          )}
         </div>
 
-        {/* Search Input Box */}
+        {/* 3D Search Input */}
         <div className="relative">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-violet-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Ketik nama anggota..."
-            className="w-full bg-slate-50 text-slate-900 placeholder-slate-400 text-sm pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:bg-white focus:ring-1 focus:ring-blue-600 transition-all"
+            placeholder="Ketik nama atau nomor anggota..."
+            className="w-full bg-[#120626] text-white placeholder-violet-400/60 text-sm pl-10 pr-4 py-3.5 rounded-2xl border border-violet-700/60 focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30 transition-all shadow-inner"
           />
         </div>
 
-        {/* Members List Container */}
-        <div className="max-h-60 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-slate-300">
+        {/* 3D Members List Grid */}
+        <div className="max-h-72 overflow-y-auto pr-1 space-y-2.5 scrollbar-thin">
           {filteredMembers.length === 0 ? (
-            <div className="text-center py-8 text-slate-500 text-xs font-medium">
-              Tidak ada anggota ditemukan dengan kata kunci "{searchQuery}".
+            <div className="text-center py-10 text-violet-300/60 text-xs font-medium bg-[#120626]/50 rounded-2xl border border-violet-800/40 p-4">
+              <UserX className="w-8 h-8 text-violet-400/40 mx-auto mb-2" />
+              Tidak ada nama anggota ditemukan dengan kata kunci "{searchQuery}".
             </div>
           ) : (
             filteredMembers.map((member) => {
@@ -127,34 +152,51 @@ export const MemberSelect: React.FC<MemberSelectProps> = ({
                   key={member.id}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => onSelectMember(member)}
-                  className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between ${
+                  className={`w-full text-left p-3.5 rounded-2xl transition-all duration-150 flex items-center justify-between ${
                     isSelected
-                      ? 'bg-blue-50 border-blue-600 text-blue-900 font-bold ring-1 ring-blue-600 shadow-sm'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
+                      ? 'bg-gradient-to-r from-violet-700/90 to-purple-800/90 border border-amber-300 text-white shadow-[0_6px_0_0_#4c1d95,0_10px_20px_rgba(0,0,0,0.5)] translate-y-[-2px]'
+                      : 'bg-[#15072d]/80 hover:bg-[#1f0b3e] border border-violet-800/60 text-violet-100'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center font-extrabold text-xs transition-colors ${
-                      isSelected ? 'bg-blue-900 text-amber-400' : 'bg-slate-200 text-slate-700'
+                    <div className={`w-11 h-11 rounded-2xl overflow-hidden flex items-center justify-center font-black text-sm shrink-0 border transition-all ${
+                      isSelected
+                        ? 'bg-amber-400 text-purple-950 border-white shadow-md'
+                        : 'bg-violet-900/60 text-violet-200 border-violet-700/60'
                     }`}>
-                      {member.name.substring(0, 2).toUpperCase()}
+                      {member.avatarUrl ? (
+                        <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" />
+                      ) : (
+                        member.name.substring(0, 2).toUpperCase()
+                      )}
                     </div>
 
                     <div>
-                      <div className="font-semibold text-sm">{member.name}</div>
+                      <div className="font-extrabold text-sm flex items-center gap-2">
+                        <span>{member.name}</span>
+                        {member.avatarUrl && (
+                          <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/40">
+                            Foto ✓
+                          </span>
+                        )}
+                      </div>
                       {member.memberNumber && (
-                        <div className="text-[11px] text-slate-500 font-medium">{member.memberNumber}</div>
+                        <div className="text-[11px] text-violet-300/70 font-mono mt-0.5">
+                          ID: {member.memberNumber}
+                        </div>
                       )}
                     </div>
                   </div>
 
                   {isAttended ? (
-                    <span className="flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-lg border border-green-200">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                    <span className="flex items-center gap-1.5 text-[11px] font-black text-emerald-300 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-500/50 shadow-sm">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                       <span>{attendanceRecord?.time}</span>
                     </span>
                   ) : (
-                    <span className="text-[11px] text-slate-400 font-medium">Belum Absen</span>
+                    <span className="text-[11px] text-violet-400/70 font-medium px-2.5 py-1 rounded-lg bg-violet-950/60">
+                      Belum Absen
+                    </span>
                   )}
                 </motion.button>
               );
@@ -163,60 +205,58 @@ export const MemberSelect: React.FC<MemberSelectProps> = ({
         </div>
       </div>
 
-      {/* Selected Member Warning / Action Box */}
+      {/* 3D SELECTED MEMBER PROCEED CARD */}
       <AnimatePresence>
         {selectedMember && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            initial={{ opacity: 0, y: 15, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4"
+            exit={{ opacity: 0, y: 15, scale: 0.96 }}
+            className="card-3d p-6 space-y-4 border-amber-400/50"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center justify-between border-b border-violet-800/60 pb-3">
               <div>
-                <span className="text-xs text-slate-500 font-medium">Anggota Dipilih:</span>
-                <div className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  {selectedMember.name}
-                  <span className="text-xs font-bold text-blue-900 bg-blue-100 px-2.5 py-0.5 rounded-full border border-blue-200">
+                <span className="text-[11px] text-violet-300 uppercase tracking-wider font-bold">Anggota Terpilih:</span>
+                <div className="text-xl font-black text-white flex items-center gap-2 mt-0.5">
+                  <span className="text-amber-300">{selectedMember.name}</span>
+                  <span className="text-[11px] font-extrabold text-violet-200 bg-violet-900/80 px-2.5 py-0.5 rounded-full border border-violet-600">
                     {selectedMember.memberNumber || 'Anggota'}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Double Attendance Prevention Check */}
+            {/* Attendance Double Check */}
             {selectedAlreadyAttendedRecord ? (
-              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="p-4 rounded-2xl bg-amber-950/80 border border-amber-400/50 text-amber-200 flex items-start gap-3 shadow-inner">
+                <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                 <div className="text-xs space-y-1">
-                  <p className="font-bold text-sm text-amber-800">
-                    Anda sudah melakukan absensi pada pukul {selectedAlreadyAttendedRecord.time}!
+                  <p className="font-black text-sm text-amber-300">
+                    Anda sudah melakukan absensi pada pukul {selectedAlreadyAttendedRecord.time} WIB!
                   </p>
-                  <p className="text-amber-700">
-                    Status: <b className="text-green-700">{selectedAlreadyAttendedRecord.status}</b> pada tanggal {selectedAlreadyAttendedRecord.date}. Rekord ganda tidak diizinkan.
+                  <p className="text-amber-200/80">
+                    Status kehadiran: <b className="text-emerald-400 font-bold">{selectedAlreadyAttendedRecord.status}</b> ({selectedAlreadyAttendedRecord.date}). Data telah tersimpan secara resmi.
                   </p>
                 </div>
               </div>
-            ) : !session.isOpen ? (
-              <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-900 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            ) : !isOpen ? (
+              <div className="p-4 rounded-2xl bg-rose-950/80 border border-rose-500/50 text-rose-200 flex items-start gap-3 shadow-inner">
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
                 <div className="text-xs space-y-1">
-                  <p className="font-bold text-sm text-red-700">ABSENSI TELAH DITUTUP</p>
-                  <p className="text-slate-600">
-                    Sesi absensi untuk hari ini telah berakhir. Hubungi pengurus Karang Taruna jika membutuhkan penyesuaian.
+                  <p className="font-black text-sm text-rose-300">SESI ABSENSI DITUTUP</p>
+                  <p className="text-rose-200/80">
+                    Sesi absensi saat ini sedang ditutup. Hubungi Pengurus Karang Taruna untuk membuka sesi.
                   </p>
                 </div>
               </div>
             ) : (
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                whileHover={{ scale: 1.01 }}
-                onClick={onStartAttendance}
-                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-full shadow-md flex items-center justify-center gap-2.5 transition-all"
+              <button
+                onClick={handleStart}
+                className="w-full py-4 btn-3d-violet text-white font-black text-sm uppercase tracking-wider rounded-2xl shadow-xl flex items-center justify-center gap-2.5"
               >
                 <Camera className="w-5 h-5 text-amber-300" />
-                <span>Buka Kamera & Liveness Verification</span>
-              </motion.button>
+                <span>Buka Kamera & Verifikasi Biometrik Wajah</span>
+              </button>
             )}
           </motion.div>
         )}

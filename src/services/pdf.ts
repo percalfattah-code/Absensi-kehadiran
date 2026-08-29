@@ -238,6 +238,80 @@ export async function generateAttendancePdf(
   return { blob, dataUrl, fileName };
 }
 
+// Generate Individual Attendance Proof PDF Card
+export async function generateSingleAttendanceReceiptPdf(
+  record: AttendanceRecord
+): Promise<PdfGenerationResult> {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [105, 148] }); // A6 size badge
+  const fileName = `BUKTI_ABSENSI_${record.name.toUpperCase().replace(/\s+/g, '_')}_${record.date.replace(/\//g, '-')}.pdf`;
+
+  // Header Box
+  doc.setFillColor(30, 58, 138); // Navy
+  doc.rect(0, 0, 105, 22, 'F');
+
+  doc.setFillColor(252, 211, 77); // Gold
+  doc.circle(12, 11, 5, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('BUKTI ABSENSI DIGITAL', 22, 10);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Karang Taruna Bintang Remaja', 22, 16);
+
+  // Content Area
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('INFORMASI KEHADIRAN:', 8, 30);
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Nama Anggota: ${record.name}`, 8, 37);
+  doc.text(`Tanggal : ${record.date}`, 8, 43);
+  doc.text(`Jam Absensi : ${record.time} WIB`, 8, 49);
+
+  doc.setFont('helvetica', 'bold');
+  if (record.status === 'HADIR') {
+    doc.setTextColor(16, 185, 129);
+  } else {
+    doc.setTextColor(245, 158, 11);
+  }
+  doc.text(`Status: ${record.status}`, 8, 55);
+
+  // Embed Photo if available
+  if (record.photoBlob) {
+    try {
+      const imgData = await blobToDataURL(record.photoBlob);
+      doc.addImage(imgData, 'JPEG', 8, 62, 45, 45);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Stamp Box
+  doc.setLineWidth(0.5);
+  doc.setDrawColor(30, 58, 138);
+  doc.roundedRect(8, 112, 89, 22, 2, 2);
+
+  doc.setTextColor(30, 58, 138);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('VERIFIKASI SISTEM BIOMETRIK VALID ✓', 12, 118);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`ID Dokumen: ${record.id}`, 12, 124);
+  doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 12, 129);
+
+  const pdfArrayBuffer = doc.output('arraybuffer');
+  const blob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
+  const dataUrl = doc.output('datauristring');
+
+  return { blob, dataUrl, fileName };
+}
+
 // Share or Download PDF with Android browser compatibility
 export async function downloadOrSharePdf(pdfResult: PdfGenerationResult): Promise<'shared' | 'downloaded'> {
   const file = new File([pdfResult.blob], pdfResult.fileName, { type: 'application/pdf' });

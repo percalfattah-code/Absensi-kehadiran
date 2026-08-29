@@ -13,25 +13,34 @@ import {
   Clock,
   X,
   Image as ImageIcon,
+  Sparkles,
+  FileSpreadsheet,
 } from 'lucide-react';
-import { AttendanceRecord, Member, AttendanceSession } from '../types';
+import { AttendanceRecord, Member, AttendanceSession, RoleMode } from '../types';
 import { generateAttendancePdf, downloadOrSharePdf } from '../services/pdf';
 
 interface AttendanceLogProps {
   records: AttendanceRecord[];
-  allMembers: Member[];
-  session: AttendanceSession;
-  onDeleteRecord: (id: string) => Promise<void>;
+  allMembers?: Member[];
+  members?: Member[];
+  session?: AttendanceSession | null;
+  onDeleteRecord?: (id: string) => Promise<void>;
+  onClearAllData?: () => Promise<void>;
+  roleMode?: RoleMode;
 }
 
 export const AttendanceLog: React.FC<AttendanceLogProps> = ({
   records,
-  allMembers,
+  allMembers = [],
+  members = [],
   session,
   onDeleteRecord,
+  onClearAllData,
+  roleMode = 'ADMIN',
 }) => {
+  const memberList = members.length > 0 ? members : allMembers;
   const [searchName, setSearchName] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'HADIR' | 'TERLAMBAT' | 'TIDAK HADIR'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'HADIR' | 'TERLAMBAT'>('ALL');
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; record: AttendanceRecord } | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
@@ -44,13 +53,19 @@ export const AttendanceLog: React.FC<AttendanceLogProps> = ({
     });
   }, [records, searchName, statusFilter]);
 
-  // Statistics
-  const totalMembers = allMembers.length;
-  const attendedCount = records.length;
-  const missingCount = Math.max(0, totalMembers - attendedCount);
-  const percentage = totalMembers > 0 ? Math.round((attendedCount / totalMembers) * 100) : 0;
+  const handleExportPdf = async () => {
+    if (!session) return;
+    setIsGeneratingPdf(true);
+    try {
+      const pdfRes = await generateAttendancePdf(session, memberList, records);
+      await downloadOrSharePdf(pdfRes);
+    } catch (e) {
+      alert('Gagal membuat dokumen PDF.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
-  // View Photo Blob Modal Handler
   const handleViewPhoto = (record: AttendanceRecord) => {
     if (!record.photoBlob) return;
     let url = '';
@@ -62,224 +77,169 @@ export const AttendanceLog: React.FC<AttendanceLogProps> = ({
     setPreviewPhoto({ url, record });
   };
 
-  // Close Photo Modal
-  const handleClosePhotoModal = () => {
-    if (previewPhoto && previewPhoto.url.startsWith('blob:')) {
-      URL.revokeObjectURL(previewPhoto.url);
-    }
-    setPreviewPhoto(null);
-  };
-
-  // Export PDF Handler
-  const handleExportPdf = async () => {
-    setIsGeneratingPdf(true);
-    try {
-      const pdfResult = await generateAttendancePdf(session, allMembers, records);
-      await downloadOrSharePdf(pdfResult);
-    } catch (e) {
-      console.error('Export PDF error:', e);
-      alert('Gagal membuat PDF rekap absensi.');
-    } finally {
-      setIsGeneratingPdf(false);
-    }
-  };
-
   return (
-    <div className="space-y-5 pb-24">
-      {/* Top Banner */}
-      <div className="bg-blue-900 p-5 rounded-3xl border border-blue-800 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-white">
+    <div className="space-y-6 pb-24">
+      {/* 3D HERO HEADER */}
+      <div className="card-3d p-6 relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300 to-transparent" />
+
         <div>
-          <span className="text-xs font-black text-amber-400 uppercase tracking-widest">Laporan Kehadiran</span>
-          <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-            <FileText className="w-6 h-6 text-amber-400" />
-            <span>REKAP ABSENSI KEHADIRAN</span>
-          </h2>
-          <p className="text-xs text-blue-200 mt-1 font-medium">
-            Data kehadiran Karang Taruna Bintang Remaja sesi {session.sessionDate}
+          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-violet-950 text-violet-300 border border-violet-500/40 text-[10px] font-black uppercase tracking-wider mb-1">
+            <FileText className="w-3.5 h-3.5 text-amber-300" />
+            <span>LAPORAN REKAPITULASI</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-white">Rekap Absensi Kehadiran</h2>
+          <p className="text-xs text-violet-200/80 mt-1">
+            Daftar lengkap kehadiran anggota, waktu presensi & bukti foto biometrik.
           </p>
         </div>
 
-        <button
-          onClick={handleExportPdf}
-          disabled={isGeneratingPdf}
-          className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-blue-950 font-extrabold rounded-full text-xs flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50 active:scale-95"
-        >
-          {isGeneratingPdf ? (
-            <span>Membuat PDF...</span>
-          ) : (
-            <>
-              <Download className="w-4 h-4 text-blue-950" />
-              <span>Export File PDF Rekap</span>
-            </>
+        <div className="flex items-center gap-2">
+          {session && (
+            <button
+              onClick={handleExportPdf}
+              disabled={isGeneratingPdf}
+              className="px-4 py-3 btn-3d-amber text-purple-950 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2"
+            >
+              <Download className="w-4 h-4 stroke-[2.5]" />
+              <span>{isGeneratingPdf ? 'Exporting...' : 'Unduh Laporan PDF'}</span>
+            </button>
           )}
-        </button>
-      </div>
 
-      {/* Summary Statistics Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="text-slate-500 font-semibold">Total Anggota</div>
-          <div className="text-lg font-black text-slate-900 mt-0.5">{totalMembers}</div>
-        </div>
-
-        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="text-slate-500 font-semibold">Hadir</div>
-          <div className="text-lg font-black text-green-600 mt-0.5">{attendedCount}</div>
-        </div>
-
-        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="text-slate-500 font-semibold">Belum Absen</div>
-          <div className="text-lg font-black text-red-600 mt-0.5">{missingCount}</div>
-        </div>
-
-        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="text-slate-500 font-semibold">Persentase</div>
-          <div className="text-lg font-black text-amber-600 mt-0.5">{percentage}%</div>
+          {roleMode === 'ADMIN' && onClearAllData && (
+            <button
+              onClick={() => {
+                if (confirm('PERINGATAN: Yakin ingin mengosongkan semua riwayat absensi?')) {
+                  onClearAllData();
+                }
+              }}
+              className="px-3.5 py-3 btn-3d-rose text-white rounded-2xl text-xs font-black"
+              title="Kosongkan Semua Data"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Filter and Search Toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-        {/* Search */}
-        <div className="relative w-full sm:w-64">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* 3D SEARCH & FILTER CONTROLS */}
+      <div className="card-3d-subtle p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-violet-400" />
           <input
             type="text"
             value={searchName}
             onChange={(e) => setSearchName(e.target.value)}
-            placeholder="Cari nama..."
-            className="w-full bg-slate-50 text-slate-900 placeholder-slate-400 pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:bg-white"
+            placeholder="Filter berdasarkan nama..."
+            className="w-full bg-[#110526] text-white placeholder-violet-400/60 text-xs pl-10 pr-4 py-2.5 rounded-xl border border-violet-700/60 focus:outline-none focus:border-violet-400"
           />
         </div>
 
-        {/* Status Filter */}
-        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-          <span className="text-slate-500 font-bold shrink-0">Filter Status:</span>
-          {(['ALL', 'HADIR', 'TERLAMBAT', 'TIDAK HADIR'] as const).map((status) => (
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {(['ALL', 'HADIR', 'TERLAMBAT'] as const).map((st) => (
             <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1.5 rounded-full font-extrabold whitespace-nowrap transition-all ${
-                statusFilter === status
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'
+              key={st}
+              onClick={() => setStatusFilter(st)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                statusFilter === st
+                  ? 'btn-3d-violet text-white'
+                  : 'btn-3d-dark text-violet-300'
               }`}
             >
-              {status}
+              {st === 'ALL' ? 'Semua Status' : st}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Attendance Log Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200">
-                <th className="p-3 text-center w-12">No</th>
-                <th className="p-3">Nama Anggota</th>
-                <th className="p-3 text-center">Tanggal</th>
-                <th className="p-3 text-center">Waktu</th>
-                <th className="p-3 text-center">Status</th>
-                <th className="p-3 text-center w-24">Foto</th>
-                <th className="p-3 text-center w-16">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-800">
-              {filteredRecords.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-10 text-slate-500">
-                    Belum ada data absensi yang sesuai filter.
-                  </td>
-                </tr>
-              ) : (
-                filteredRecords.map((record, idx) => (
-                  <tr key={record.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-3 text-center font-mono text-slate-400">{idx + 1}</td>
-                    <td className="p-3 font-bold text-slate-900">{record.name}</td>
-                    <td className="p-3 text-center font-mono text-slate-600">{record.date}</td>
-                    <td className="p-3 text-center font-mono text-blue-900 font-extrabold">{record.time}</td>
-                    <td className="p-3 text-center">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                          record.status === 'HADIR'
-                            ? 'bg-green-100 text-green-700 border border-green-200'
-                            : record.status === 'TERLAMBAT'
-                            ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                            : 'bg-red-100 text-red-700 border border-red-200'
-                        }`}
-                      >
-                        {record.status}
-                      </span>
-                    </td>
-                    <td className="p-3 text-center">
-                      <button
-                        onClick={() => handleViewPhoto(record)}
-                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-blue-700 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 border border-slate-200 transition-all"
-                      >
-                        <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Foto</span>
-                      </button>
-                    </td>
-                    <td className="p-3 text-center">
-                      <button
-                        onClick={() => {
-                          if (confirm(`Hapus data absensi ${record.name}?`)) {
-                            onDeleteRecord(record.id);
-                          }
-                        }}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-slate-100 rounded-lg transition-all"
-                        title="Hapus Record"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* 3D TABLE / CARD LIST */}
+      <div className="space-y-3">
+        {filteredRecords.length === 0 ? (
+          <div className="card-3d p-8 text-center text-xs text-violet-400">
+            Tidak ada riwayat absensi yang ditemukan.
+          </div>
+        ) : (
+          filteredRecords.map((r) => (
+            <div
+              key={r.id}
+              className="card-3d-subtle p-4 flex items-center justify-between gap-3 hover:border-violet-400/60 transition-all text-xs"
+            >
+              <div className="flex items-center gap-3.5">
+                <div
+                  onClick={() => handleViewPhoto(r)}
+                  className="w-12 h-12 rounded-2xl overflow-hidden bg-[#100522] border-2 border-violet-600/40 shrink-0 flex items-center justify-center cursor-pointer hover:scale-105 transition-transform"
+                >
+                  <Eye className="w-5 h-5 text-amber-300" />
+                </div>
+
+                <div>
+                  <div className="font-extrabold text-sm text-white">{r.name}</div>
+                  <div className="text-[11px] text-violet-300/80 font-mono mt-0.5">
+                    {r.date} • {r.time} WIB
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className={`px-3 py-1 text-[10px] font-black rounded-xl border ${
+                  r.status === 'HADIR'
+                    ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40'
+                    : 'bg-amber-950 text-amber-300 border-amber-500/40'
+                }`}>
+                  {r.status}
+                </span>
+
+                <button
+                  onClick={() => handleViewPhoto(r)}
+                  className="p-2 btn-3d-dark text-violet-300 rounded-xl"
+                  title="Lihat Foto Absensi"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+
+                {roleMode === 'ADMIN' && onDeleteRecord && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Hapus catatan absensi ${r.name}?`)) {
+                        onDeleteRecord(r.id);
+                      }
+                    }}
+                    className="p-2 btn-3d-rose text-white rounded-xl"
+                    title="Hapus Rekord"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
-      {/* Photo Preview Modal */}
+      {/* 3D PHOTO PREVIEW MODAL */}
       {previewPhoto && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 p-5 max-w-sm w-full shadow-2xl space-y-4 text-center text-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900 text-left">{previewPhoto.record.name}</h3>
-                <p className="text-[11px] text-slate-500 text-left">
-                  {previewPhoto.record.date} jam {previewPhoto.record.time} WIB
-                </p>
-              </div>
-              <button
-                onClick={handleClosePhotoModal}
-                className="p-1 text-slate-400 hover:text-slate-800 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="card-3d p-6 max-w-sm w-full space-y-4 text-white text-center relative border-violet-400/50">
+            <button
+              onClick={() => setPreviewPhoto(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-xl bg-violet-950 text-violet-400"
+            >
+              <X className="w-4 h-4" />
+            </button>
 
-            {/* Image display */}
-            <div className="w-64 h-64 mx-auto rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-inner">
-              <img
-                src={previewPhoto.url}
-                alt={`Foto Absensi ${previewPhoto.record.name}`}
-                className="w-full h-full object-cover"
-              />
+            <h3 className="font-black text-base text-white">{previewPhoto.record.name}</h3>
+            <div className="w-64 h-64 mx-auto rounded-2xl overflow-hidden border-2 border-amber-400 shadow-xl bg-black">
+              <img src={previewPhoto.url} alt="Bukti Foto" className="w-full h-full object-cover" />
             </div>
-
-            <div className="text-[11px] font-mono text-slate-500 break-all bg-slate-50 p-2 rounded-xl border border-slate-200">
-              {previewPhoto.record.fileName}
-            </div>
+            <p className="text-[11px] text-violet-300 font-mono">
+              Waktu Presensi: {previewPhoto.record.date} {previewPhoto.record.time} WIB
+            </p>
 
             <button
-              onClick={handleClosePhotoModal}
-              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold rounded-full text-xs"
+              onClick={() => setPreviewPhoto(null)}
+              className="w-full py-3 btn-3d-dark text-white rounded-xl font-bold text-xs"
             >
-              Tutup Preview
+              Tutup Foto
             </button>
           </div>
         </div>
