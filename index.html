@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>BINTANG REMAJA - Sistem Absensi Kehadiran Karang Taruna</title>
+    <meta name="description" content="Sistem Absensi Kehadiran Karang Taruna berbasis Website/PWA dengan Deteksi Wajah Real-time & Liveness Verification." />
+    <meta property="og:title" content="BINTANG REMAJA - Absensi Karang Taruna" />
+    <meta property="og:description" content="Sistem Absensi Kehadiran Karang Taruna berbasis Web & PWA." />
+    <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#1e3a8a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Bintang" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/star-logo.svg" />
+  </head>
+  <body class="bg-slate-50 text-slate-900 antialiased font-sans select-none overflow-x-hidden">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(reg => console.log('ServiceWorker registered:', reg.scope))
+            .catch(err => console.log('ServiceWorker error:', err));
+        });
+      }
+    </script>
+  </body>
+</html>
+

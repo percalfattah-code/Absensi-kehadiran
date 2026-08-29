@@ -1,0 +1,18 @@
+{
+  "name": "Bintang Remaja",
+  "short_name": "Bintang",
+  "description": "Sistem Absensi Kehadiran Karang Taruna berbasis Web & PWA dengan Liveness Verification",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e3a8a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/star-logo.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

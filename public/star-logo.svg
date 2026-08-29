@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E3A8A" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCD34D" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="100%" stop-color="#2563EB" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Outer Circle Frame -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" />
+  <circle cx="256" cy="256" r="210" fill="none" stroke="url(#ringGrad)" stroke-width="12" opacity="0.8" />
+  <circle cx="256" cy="256" r="190" fill="#1E293B" opacity="0.6" />
+
+  <!-- Dynamic Star -->
+  <g filter="url(#glow)">
+    <polygon points="256,90 298,186 402,198 325,268 346,370 256,318 166,370 187,268 110,198 214,186" fill="url(#starGrad)" />
+  </g>
+
+  <!-- Decorative Inner Accent -->
+  <polygon points="256,120 289,195 371,204 310,260 327,341 256,300" fill="#FFEFE0" opacity="0.3" />
+  
+  <!-- Youth Laurel Leaves / Emblem Accent -->
+  <path d="M 140 380 Q 256 430 372 380" fill="none" stroke="#60A5FA" stroke-width="8" stroke-linecap="round" />
+</svg>
