@@ -77,9 +77,14 @@ export const Header: React.FC<HeaderProps> = ({
               <h1 className="text-sm sm:text-base font-black text-white uppercase tracking-wider leading-tight flex items-center gap-1">
                 <span>BINTANG REMAJA</span>
               </h1>
-              {isOffline && (
+              {isOffline ? (
                 <span className="px-1.5 py-0.2 text-[9px] font-bold bg-amber-400/20 text-amber-300 rounded-full border border-amber-400/40">
                   Offline
+                </span>
+              ) : (
+                <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-black bg-emerald-950/80 text-emerald-300 rounded-full border border-emerald-500/50 shadow-sm" title="Tersambung ke Cloud Database Firebase - Sinkronisasi Semua HP Aktif">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Cloud Sync Live</span>
                 </span>
               )}
             </div>

@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "members": {
+      "title": "Members",
+      "description": "Daftar anggota Karang Taruna Bintang Remaja dan data biometrik wajah",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "position": { "type": "string" },
+        "memberNumber": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "faceLandmarks": { "type": "array", "items": { "type": "number" } },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "name", "isActive", "createdAt"]
+    },
+    "attendance_records": {
+      "title": "Attendance Records",
+      "description": "Rekapitulasi absensi kehadiran anggota",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "memberId": { "type": "string" },
+        "name": { "type": "string" },
+        "position": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "status": { "type": "string" },
+        "fileName": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "photoBlob": { "type": "string" }
+      },
+      "required": ["id", "name", "date", "time", "status", "timestamp"]
+    },
+    "announcements": {
+      "title": "Announcements",
+      "description": "Pengumuman dan agenda kegiatan Karang Taruna",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "eventDate": { "type": "string" },
+        "eventTime": { "type": "string" },
+        "location": { "type": "string" },
+        "category": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "title", "description", "eventDate", "isActive", "createdAt"]
+    },
+    "session_config": {
+      "title": "Session Configuration",
+      "description": "Konfigurasi status sesi absensi aktif",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sessionDate": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "isOpen": { "type": "boolean" },
+        "location": { "type": "string" },
+        "notes": { "type": "string" },
+        "requiredPosition": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["isOpen", "sessionDate"]
+    }
+  },
+  "firestore": {
+    "members": {
+      "entity": "members",
+      "description": "Koleksi anggota Karang Taruna"
+    },
+    "attendance_records": {
+      "entity": "attendance_records",
+      "description": "Koleksi absensi kehadiran"
+    },
+    "announcements": {
+      "entity": "announcements",
+      "description": "Koleksi pengumuman dan agenda kegiatan"
+    },
+    "session_config": {
+      "entity": "session_config",
+      "description": "Koleksi konfigurasi sesi absensi"
+    }
+  }
+}

@@ -18,6 +18,10 @@ import {
   addAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
+  subscribeMembers,
+  subscribeAttendanceRecords,
+  subscribeAnnouncements,
+  subscribeActiveSession,
 } from './services/db';
 import { generateAttendancePdf, downloadOrSharePdf } from './services/pdf';
 import {
@@ -95,6 +99,23 @@ export default function App() {
   useEffect(() => {
     loadData();
 
+    // Set up Real-time Firebase Firestore Listeners (Instant sync across all phones)
+    const unsubMembers = subscribeMembers((cloudMembers) => {
+      setMembers(cloudMembers);
+    });
+
+    const unsubRecords = subscribeAttendanceRecords((cloudRecords) => {
+      setAttendanceRecords(cloudRecords);
+    });
+
+    const unsubAnnouncements = subscribeAnnouncements((cloudAnnouncements) => {
+      setAnnouncements(cloudAnnouncements);
+    });
+
+    const unsubSession = subscribeActiveSession((cloudSession) => {
+      setSession(cloudSession);
+    });
+
     // Parse URL params for Android Shortcut / Homescreen launch
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -138,6 +159,10 @@ export default function App() {
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
+      unsubMembers();
+      unsubRecords();
+      unsubAnnouncements();
+      unsubSession();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
