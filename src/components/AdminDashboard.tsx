@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Clock,
   Users,
@@ -18,8 +18,14 @@ import {
   Megaphone,
   Send,
   Calendar,
+  Github,
+  GitBranch,
+  ExternalLink,
+  UploadCloud,
+  RefreshCw,
 } from 'lucide-react';
 import { AttendanceSession, AttendanceRecord, Member, EventAnnouncement } from '../types';
+import { githubService, GitHubConfig } from '../services/github';
 
 interface AdminDashboardProps {
   session: AttendanceSession | null;
@@ -31,6 +37,7 @@ interface AdminDashboardProps {
   onToggleSession?: () => void;
   onExportPdf?: () => void;
   onNavigate?: (view: any) => void;
+  onOpenGitHubModal?: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -43,13 +50,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onToggleSession,
   onExportPdf,
   onNavigate,
+  onOpenGitHubModal,
 }) => {
+  const [ghConfig, setGhConfig] = useState<GitHubConfig>(githubService.getConfig());
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    return githubService.subscribe(setGhConfig);
+  }, []);
+
   const memberList = members.length > 0 ? members : allMembers;
   const totalMembers = memberList.length;
   const attendedCount = records.length;
   const missingCount = Math.max(0, totalMembers - attendedCount);
   const percentage = totalMembers > 0 ? Math.round((attendedCount / totalMembers) * 100) : 0;
   const latestAnnouncement = announcements.length > 0 ? announcements[0] : null;
+  const isGhConfigured = Boolean(ghConfig.token && ghConfig.owner && ghConfig.repo);
+
+  const handleQuickGitHubPush = async () => {
+    if (!isGhConfigured) {
+      if (onOpenGitHubModal) onOpenGitHubModal();
+      return;
+    }
+    setIsManualSyncing(true);
+    setSyncFeedback(null);
+    try {
+      await githubService.syncNow(
+        {
+          members: memberList,
+          records,
+          announcements,
+          session,
+        },
+        'Quick Push dari Dashboard'
+      );
+      setSyncFeedback('Data berhasil di-update ke GitHub!');
+      setTimeout(() => setSyncFeedback(null), 3500);
+    } catch (err: any) {
+      setSyncFeedback('Gagal: ' + (err.message || 'Error'));
+      setTimeout(() => setSyncFeedback(null), 4000);
+    } finally {
+      setIsManualSyncing(false);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-24">
@@ -69,6 +113,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {onOpenGitHubModal && (
+            <button
+              onClick={onOpenGitHubModal}
+              className="px-4 py-3.5 btn-3d-violet text-amber-300 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg"
+            >
+              <Github className="w-4 h-4 text-amber-400" />
+              <span>GitHub Sync</span>
+            </button>
+          )}
+
           {onNavigate && (
             <button
               onClick={() => onNavigate('pengumuman')}
@@ -99,6 +153,76 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>Buka Sesi Absensi</span>
                 </>
               )}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* GITHUB AUTO-SYNC HERO BANNER */}
+      <div className="card-3d p-4 sm:p-5 bg-gradient-to-r from-[#170630] via-[#220a44] to-[#16062f] border-violet-500/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-[#0e031c] border border-violet-600/80 text-amber-400 flex items-center justify-center shrink-0 shadow-inner">
+            <Github className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-black text-white">Sinkronisasi Otomatis GitHub</span>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${
+                ghConfig.lastStatus === 'syncing'
+                  ? 'bg-blue-950 text-blue-300 border-blue-600 animate-pulse'
+                  : isGhConfigured
+                  ? 'bg-emerald-950 text-emerald-300 border-emerald-600'
+                  : 'bg-amber-950 text-amber-300 border-amber-600'
+              }`}>
+                {ghConfig.lastStatus === 'syncing'
+                  ? 'Sedang Sync...'
+                  : isGhConfigured
+                  ? 'Auto-Sync Aktif'
+                  : 'Belum Terhubung'}
+              </span>
+            </div>
+            <p className="text-[11px] text-violet-300/90 mt-0.5">
+              {isGhConfigured
+                ? `Tersambung ke repo "${ghConfig.owner}/${ghConfig.repo}" (branch: ${ghConfig.branch || 'main'}). Tiap ada perubahan data di aplikasi, file GitHub langsung ter-update.`
+                : 'Hubungkan Personal Access Token agar semua editan data otomatis tersimpan dan ter-commit ke GitHub.'}
+            </p>
+            {ghConfig.lastCommitUrl && (
+              <div className="text-[10px] text-amber-300/90 mt-1 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                <span>Terakhir ter-update: Commit <strong>{ghConfig.lastCommitSha}</strong></span>
+                <a
+                  href={ghConfig.lastCommitUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline hover:text-white flex items-center gap-0.5 font-bold"
+                >
+                  Buka di GitHub <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              </div>
+            )}
+            {syncFeedback && (
+              <div className="text-[10px] font-bold text-emerald-300 mt-1">
+                {syncFeedback}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-stretch md:self-auto shrink-0">
+          <button
+            onClick={handleQuickGitHubPush}
+            disabled={isManualSyncing}
+            className="flex-1 md:flex-initial px-3.5 py-2.5 btn-3d-amber text-purple-950 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
+          >
+            <UploadCloud className={`w-3.5 h-3.5 ${isManualSyncing ? 'animate-bounce' : ''}`} />
+            <span>{isManualSyncing ? 'Menyimpan...' : 'Push Sekarang'}</span>
+          </button>
+          {onOpenGitHubModal && (
+            <button
+              onClick={onOpenGitHubModal}
+              className="px-3.5 py-2.5 btn-3d-dark text-violet-200 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
+            >
+              <span>⚙️ Pengaturan</span>
             </button>
           )}
         </div>

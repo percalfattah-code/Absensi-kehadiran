@@ -43,6 +43,8 @@ import { AnnouncementPanel } from './components/AnnouncementPanel';
 import { AndroidShortcutModal } from './components/AndroidShortcutModal';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { LoginScreen } from './components/LoginScreen';
+import { GitHubSyncModal } from './components/GitHubSyncModal';
+import { githubService } from './services/github';
 import { Shield, ShieldCheck, UserCheck, Bell, Lock, Unlock, Megaphone, FileSpreadsheet, Smartphone, Download } from 'lucide-react';
 
 export default function App() {
@@ -51,6 +53,7 @@ export default function App() {
   const [roleMode, setRoleMode] = useState<RoleMode>('MEMBER');
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
   const [pendingAdminView, setPendingAdminView] = useState<ViewMode | null>(null);
+  const [isGitHubModalOpen, setIsGitHubModalOpen] = useState(false);
 
   const [members, setMembers] = useState<Member[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
@@ -315,6 +318,62 @@ export default function App() {
 
     // Auto sync to Google Sheets
     triggerGoogleSheetsSync(members, updatedRecords);
+
+    // Auto sync to GitHub
+    triggerAutoGitHubSync(members, updatedRecords, announcements, session, `Absensi Baru: ${newRecord.name}`);
+  };
+
+  // Helper for automatic GitHub sync on any data update
+  const triggerAutoGitHubSync = (
+    currentMembers: Member[],
+    currentRecords: AttendanceRecord[],
+    currentAnnouncements: EventAnnouncement[],
+    currentSession: AttendanceSession | null,
+    reason: string
+  ) => {
+    githubService.triggerAutoSync(
+      {
+        members: currentMembers,
+        records: currentRecords,
+        announcements: currentAnnouncements,
+        session: currentSession,
+      },
+      reason
+    );
+  };
+
+  // Handler when data is pulled / imported from GitHub
+  const handleDataPulledFromGitHub = async (pulledData: {
+    members?: Member[];
+    attendance?: AttendanceRecord[];
+    announcements?: EventAnnouncement[];
+    session?: AttendanceSession;
+  }) => {
+    if (pulledData.members && Array.isArray(pulledData.members)) {
+      for (const m of pulledData.members) {
+        await updateMember(m);
+      }
+      const updatedM = await getAllMembers();
+      setMembers(updatedM);
+    }
+    if (pulledData.attendance && Array.isArray(pulledData.attendance)) {
+      for (const r of pulledData.attendance) {
+        await saveAttendanceRecord(r);
+      }
+      const updatedR = await getAllAttendanceRecords();
+      setAttendanceRecords(updatedR);
+    }
+    if (pulledData.announcements && Array.isArray(pulledData.announcements)) {
+      for (const a of pulledData.announcements) {
+        await updateAnnouncement(a);
+      }
+      const updatedA = await getAllAnnouncements();
+      setAnnouncements(updatedA);
+    }
+    if (pulledData.session) {
+      await updateActiveSession(pulledData.session);
+      setSession(pulledData.session);
+    }
   };
 
   // Member CRUD Actions
@@ -323,6 +382,7 @@ export default function App() {
     const updatedM = await getAllMembers();
     setMembers(updatedM);
     triggerGoogleSheetsSync(updatedM, attendanceRecords);
+    triggerAutoGitHubSync(updatedM, attendanceRecords, announcements, session, `Tambah Anggota: ${newM.name}`);
   };
 
   const handleUpdateMember = async (updatedM: Member) => {
@@ -330,6 +390,7 @@ export default function App() {
     const refreshed = await getAllMembers();
     setMembers(refreshed);
     triggerGoogleSheetsSync(refreshed, attendanceRecords);
+    triggerAutoGitHubSync(refreshed, attendanceRecords, announcements, session, `Update Anggota: ${updatedM.name}`);
   };
 
   const handleDeleteMember = async (id: string) => {
@@ -337,12 +398,14 @@ export default function App() {
     const refreshed = await getAllMembers();
     setMembers(refreshed);
     triggerGoogleSheetsSync(refreshed, attendanceRecords);
+    triggerAutoGitHubSync(refreshed, attendanceRecords, announcements, session, `Hapus Anggota`);
   };
 
   const handleClearAllMembers = async () => {
     await clearAllMembersData();
     setMembers([]);
     triggerGoogleSheetsSync([], attendanceRecords);
+    triggerAutoGitHubSync([], attendanceRecords, announcements, session, `Kosongkan Anggota`);
   };
 
   // Delete Record Action
@@ -351,22 +414,29 @@ export default function App() {
     const refreshed = await getAllAttendanceRecords();
     setAttendanceRecords(refreshed);
     triggerGoogleSheetsSync(members, refreshed);
+    triggerAutoGitHubSync(members, refreshed, announcements, session, `Hapus Rekap Absensi`);
   };
 
   // Announcement CRUD Handlers
   const handleAddAnnouncement = async (ann: Omit<EventAnnouncement, 'id' | 'createdAt'>) => {
     const created = await addAnnouncement(ann);
-    setAnnouncements((prev) => [created, ...prev]);
+    const updatedAnnouncements = [created, ...announcements];
+    setAnnouncements(updatedAnnouncements);
+    triggerAutoGitHubSync(members, attendanceRecords, updatedAnnouncements, session, `Tambah Pengumuman: ${ann.title}`);
   };
 
   const handleUpdateAnnouncement = async (ann: EventAnnouncement) => {
     await updateAnnouncement(ann);
-    setAnnouncements((prev) => prev.map((item) => (item.id === ann.id ? ann : item)));
+    const updatedAnnouncements = announcements.map((item) => (item.id === ann.id ? ann : item));
+    setAnnouncements(updatedAnnouncements);
+    triggerAutoGitHubSync(members, attendanceRecords, updatedAnnouncements, session, `Update Pengumuman: ${ann.title}`);
   };
 
   const handleDeleteAnnouncement = async (id: string) => {
     await deleteAnnouncement(id);
-    setAnnouncements((prev) => prev.filter((item) => item.id !== id));
+    const remaining = announcements.filter((item) => item.id !== id);
+    setAnnouncements(remaining);
+    triggerAutoGitHubSync(members, attendanceRecords, remaining, session, `Hapus Pengumuman`);
   };
 
   // Clear All Attendance Data Action
@@ -374,6 +444,7 @@ export default function App() {
     await clearAllAttendanceData();
     setAttendanceRecords([]);
     triggerGoogleSheetsSync(members, []);
+    triggerAutoGitHubSync(members, [], announcements, session, `Kosongkan Data Absensi`);
   };
 
   // Toggle Session Open Status
@@ -382,12 +453,14 @@ export default function App() {
     const updated = { ...session, isOpen: !session.isOpen };
     setSession(updated);
     await updateActiveSession(updated);
+    triggerAutoGitHubSync(members, attendanceRecords, announcements, updated, `Ubah Status Sesi Absensi: ${updated.isOpen ? 'Dibuka' : 'Ditutup'}`);
   };
 
   // Update Session Configuration
   const handleUpdateSessionConfig = async (updated: AttendanceSession) => {
     setSession(updated);
     await updateActiveSession(updated);
+    triggerAutoGitHubSync(members, attendanceRecords, announcements, updated, `Update Pengaturan Sesi`);
   };
 
   // PWA Install Trigger
@@ -473,6 +546,7 @@ export default function App() {
         onLockAdminMode={handleLockAdminMode}
         onLogoutToLoginScreen={() => setIsLoggedIn(false)}
         onConnectGoogleSheets={handleConnectGoogleSheets}
+        onOpenGitHubModal={() => setIsGitHubModalOpen(true)}
       />
 
       {/* Active Role Portal Banner & Notification Ticker */}
@@ -690,6 +764,7 @@ export default function App() {
                 countdownText={countdownText}
                 onToggleSession={handleToggleSession}
                 onNavigate={(v) => setCurrentView(v)}
+                onOpenGitHubModal={() => setIsGitHubModalOpen(true)}
               />
             </motion.div>
           )}
@@ -706,6 +781,7 @@ export default function App() {
               <SessionSettings
                 session={session}
                 onUpdateSession={handleUpdateSessionConfig}
+                onOpenGitHubModal={() => setIsGitHubModalOpen(true)}
               />
             </motion.div>
           )}
@@ -737,6 +813,17 @@ export default function App() {
           onInstallNative={handleInstallPwa}
         />
       )}
+
+      {/* GitHub Sync & Backup Modal */}
+      <GitHubSyncModal
+        isOpen={isGitHubModalOpen}
+        onClose={() => setIsGitHubModalOpen(false)}
+        members={members}
+        records={attendanceRecords}
+        announcements={announcements}
+        session={session}
+        onDataPulled={handleDataPulledFromGitHub}
+      />
     </div>
   );
 }

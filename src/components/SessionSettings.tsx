@@ -1,17 +1,20 @@
-import React, { useState } from 'react';
-import { Settings, Clock, Calendar, ShieldAlert, Trash2, Save, CheckCircle2, ShieldCheck, FileSpreadsheet } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, Clock, Calendar, ShieldAlert, Trash2, Save, CheckCircle2, ShieldCheck, FileSpreadsheet, Github, ExternalLink, RefreshCw, UploadCloud } from 'lucide-react';
 import { AttendanceSession } from '../types';
+import { githubService, GitHubConfig } from '../services/github';
 
 interface SessionSettingsProps {
   session: AttendanceSession;
   onUpdateSession: (updated: AttendanceSession) => Promise<void>;
   onClearAllData?: () => Promise<void>;
+  onOpenGitHubModal?: () => void;
 }
 
 export const SessionSettings: React.FC<SessionSettingsProps> = ({
   session,
   onUpdateSession,
   onClearAllData,
+  onOpenGitHubModal,
 }) => {
   const [sessionDate, setSessionDate] = useState(session.sessionDate);
   const [startTime, setStartTime] = useState(session.startTime);
@@ -20,6 +23,13 @@ export const SessionSettings: React.FC<SessionSettingsProps> = ({
   const [isOpen, setIsOpen] = useState(session.isOpen);
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [ghConfig, setGhConfig] = useState<GitHubConfig>(githubService.getConfig());
+
+  useEffect(() => {
+    return githubService.subscribe(setGhConfig);
+  }, []);
+
+  const isGhConfigured = Boolean(ghConfig.token && ghConfig.owner && ghConfig.repo);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +63,40 @@ export const SessionSettings: React.FC<SessionSettingsProps> = ({
           <p className="text-xs text-violet-200/80 mt-1">
             Atur tanggal sesi, jam buka, jam tutup, dan batas keterlambatan.
           </p>
+        </div>
+      </div>
+
+      {/* GITHUB INTEGRATION CARD IN SETTINGS */}
+      <div className="card-3d-subtle p-5 space-y-3 text-xs text-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#110526] border border-violet-700/80 text-amber-400 flex items-center justify-center">
+              <Github className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-extrabold text-white text-sm flex items-center gap-2">
+                <span>Sinkronisasi Otomatis GitHub</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                  isGhConfigured ? 'bg-emerald-950 text-emerald-300 border border-emerald-600' : 'bg-amber-950 text-amber-300 border border-amber-600'
+                }`}>
+                  {isGhConfigured ? 'Auto-Sync Aktif' : 'Belum Terhubung'}
+                </span>
+              </div>
+              <div className="text-[11px] text-violet-300 mt-0.5">
+                {isGhConfigured ? `Repository: ${ghConfig.owner}/${ghConfig.repo} (${ghConfig.branch})` : 'Setiap kali edit data, file di GitHub akan otomatis ter-commit.'}
+              </div>
+            </div>
+          </div>
+
+          {onOpenGitHubModal && (
+            <button
+              type="button"
+              onClick={onOpenGitHubModal}
+              className="px-3.5 py-2 btn-3d-amber text-purple-950 rounded-xl text-xs font-black shrink-0"
+            >
+              {isGhConfigured ? '⚙️ Atur' : 'Hubungkan'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -143,3 +187,4 @@ export const SessionSettings: React.FC<SessionSettingsProps> = ({
     </div>
   );
 };
+

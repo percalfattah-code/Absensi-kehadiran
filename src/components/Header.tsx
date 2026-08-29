@@ -15,6 +15,7 @@ import {
 import { AttendanceSession, RoleMode } from '../types';
 import { GoogleSheetsSyncState } from '../services/googleSheets';
 import { audioService } from '../services/audioService';
+import { GitHubSyncIndicator } from './GitHubSyncIndicator';
 
 interface HeaderProps {
   session: AttendanceSession | null;
@@ -27,6 +28,7 @@ interface HeaderProps {
   onLockAdminMode: () => void;
   onLogoutToLoginScreen: () => void;
   onConnectGoogleSheets: () => void;
+  onOpenGitHubModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -40,6 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLockAdminMode,
   onLogoutToLoginScreen,
   onConnectGoogleSheets,
+  onOpenGitHubModal,
 }) => {
   const isSessionOpen = session?.isOpen ?? false;
 
@@ -98,6 +101,11 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Action Badges & Buttons */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* GitHub Sync Status / Indicator */}
+          {roleMode === 'ADMIN' && onOpenGitHubModal && (
+            <GitHubSyncIndicator onOpenModal={onOpenGitHubModal} />
+          )}
+
           {/* Mode Switcher Button */}
           {roleMode === 'ADMIN' ? (
             <button
@@ -133,3 +141,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

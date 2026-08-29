@@ -13,7 +13,261 @@ async function startServer() {
     res.json({ status: 'ok', service: 'Bintang Remaja Karang Taruna Backend' });
   });
 
+  // ==========================================
+  // GITHUB AUTO-SYNC & PERSISTENCE API ENDPOINTS
+  // ==========================================
+  
+  // 1. Get default GitHub config (from server env if available)
+  app.get('/api/github/config', (req, res) => {
+    res.json({
+      hasEnvToken: Boolean(process.env.GITHUB_TOKEN),
+      defaultOwner: process.env.GITHUB_REPO_OWNER || '',
+      defaultRepo: process.env.GITHUB_REPO_NAME || '',
+      defaultBranch: process.env.GITHUB_BRANCH || 'main',
+    });
+  });
+
+  // 2. Test GitHub connection & repository permissions
+  app.post('/api/github/test', async (req, res) => {
+    try {
+      const token = req.body.token || process.env.GITHUB_TOKEN;
+      const owner = req.body.owner || process.env.GITHUB_REPO_OWNER;
+      const repo = req.body.repo || process.env.GITHUB_REPO_NAME;
+      const branch = req.body.branch || process.env.GITHUB_BRANCH || 'main';
+
+      if (!token) {
+        return res.status(400).json({ error: 'GitHub Personal Access Token (PAT) wajib diisi.' });
+      }
+      if (!owner || !repo) {
+        return res.status(400).json({ error: 'Owner (Username/Org) dan Nama Repository GitHub wajib diisi.' });
+      }
+
+      // Check repository access
+      const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'User-Agent': 'BintangRemaja-App',
+        },
+      });
+
+      if (!repoRes.ok) {
+        if (repoRes.status === 401) {
+          return res.status(401).json({ error: 'Token GitHub tidak valid atau sudah kedaluwarsa. Periksa kembali token Anda.' });
+        }
+        if (repoRes.status === 404) {
+          return res.status(404).json({ error: `Repository "${owner}/${repo}" tidak ditemukan atau token tidak memiliki izin akses ke repo ini.` });
+        }
+        const errText = await repoRes.text();
+        return res.status(repoRes.status).json({ error: `Gagal mengakses repo (${repoRes.status}): ${errText}` });
+      }
+
+      const repoData = await repoRes.json();
+
+      // Check branch
+      const branchRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/branches/${branch}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'User-Agent': 'BintangRemaja-App',
+        },
+      });
+
+      const branchExists = branchRes.ok;
+
+      return res.json({
+        success: true,
+        fullName: repoData.full_name,
+        isPrivate: repoData.private,
+        defaultBranch: repoData.default_branch,
+        targetBranch: branch,
+        branchExists,
+        permissions: repoData.permissions,
+        htmlUrl: repoData.html_url,
+      });
+    } catch (error: any) {
+      console.error('GitHub Test Error:', error);
+      return res.status(500).json({ error: 'Terjadi kesalahan saat memeriksa GitHub: ' + error.message });
+    }
+  });
+
+  // 3. Push / Auto-Commit files to GitHub Repository
+  app.post('/api/github/sync', async (req, res) => {
+    try {
+      const token = req.body.token || process.env.GITHUB_TOKEN;
+      const owner = req.body.owner || process.env.GITHUB_REPO_OWNER;
+      const repo = req.body.repo || process.env.GITHUB_REPO_NAME;
+      const branch = req.body.branch || process.env.GITHUB_BRANCH || 'main';
+      const commitMessage = req.body.commitMessage || `Auto-sync data from Bintang Remaja App (${new Date().toLocaleString('id-ID')})`;
+      const files: Array<{ path: string; content: string }> = req.body.files || [];
+
+      if (!token) {
+        return res.status(400).json({ error: 'GitHub Token tidak ditemukan. Silakan konfigurasi token terlebih dahulu.' });
+      }
+      if (!owner || !repo) {
+        return res.status(400).json({ error: 'Owner dan Repository GitHub belum diatur.' });
+      }
+      if (files.length === 0) {
+        return res.status(400).json({ error: 'Tidak ada data file yang akan disinkronkan ke GitHub.' });
+      }
+
+      const updatedFiles: Array<{ path: string; sha: string; commitUrl?: string }> = [];
+
+      for (const file of files) {
+        const filePath = file.path.replace(/^\//, ''); // Strip leading slash
+        const rawContent = file.content;
+        const base64Content = Buffer.from(rawContent, 'utf-8').toString('base64');
+
+        // Step A: Check if file exists to obtain current SHA
+        let existingSha: string | undefined;
+        let existingContentBase64: string | undefined;
+
+        try {
+          const getFileRes = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: 'application/vnd.github.v3+json',
+                'User-Agent': 'BintangRemaja-App',
+              },
+            }
+          );
+
+          if (getFileRes.ok) {
+            const fileData = await getFileRes.json();
+            existingSha = fileData.sha;
+            existingContentBase64 = (fileData.content || '').replace(/\n/g, '');
+          }
+        } catch (err) {
+          console.warn(`Could not check existing file ${filePath}:`, err);
+        }
+
+        // If content is completely unchanged, skip to avoid spamming identical commits
+        if (existingContentBase64 && existingContentBase64 === base64Content) {
+          updatedFiles.push({ path: filePath, sha: existingSha || 'unchanged' });
+          continue;
+        }
+
+        // Step B: Put/Commit file
+        const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/vnd.github.v3+json',
+            'User-Agent': 'BintangRemaja-App',
+          },
+          body: JSON.stringify({
+            message: `${commitMessage} [${filePath}]`,
+            content: base64Content,
+            sha: existingSha,
+            branch: branch,
+          }),
+        });
+
+        if (!putRes.ok) {
+          const errText = await putRes.text();
+          console.error(`Failed to commit file ${filePath}:`, errText);
+          return res.status(putRes.status).json({
+            error: `Gagal commit file ${filePath} ke GitHub (${putRes.status}): ${errText}`,
+          });
+        }
+
+        const putData = await putRes.json();
+        updatedFiles.push({
+          path: filePath,
+          sha: putData.content?.sha || putData.commit?.sha,
+          commitUrl: putData.commit?.html_url,
+        });
+      }
+
+      const latestCommitUrl = updatedFiles.find((f) => f.commitUrl)?.commitUrl || `https://github.com/${owner}/${repo}/commits/${branch}`;
+
+      return res.json({
+        success: true,
+        message: 'Data aplikasi berhasil di-update dan di-commit otomatis ke GitHub!',
+        repo: `${owner}/${repo}`,
+        branch,
+        updatedFiles,
+        latestCommitUrl,
+        syncedAt: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error('GitHub Sync Error:', error);
+      return res.status(500).json({ error: 'Terjadi kesalahan saat menyinkronkan data ke GitHub: ' + error.message });
+    }
+  });
+
+  // 4. Pull / Import data from GitHub repository
+  app.post('/api/github/pull', async (req, res) => {
+    try {
+      const token = req.body.token || process.env.GITHUB_TOKEN;
+      const owner = req.body.owner || process.env.GITHUB_REPO_OWNER;
+      const repo = req.body.repo || process.env.GITHUB_REPO_NAME;
+      const branch = req.body.branch || process.env.GITHUB_BRANCH || 'main';
+
+      if (!token) {
+        return res.status(400).json({ error: 'GitHub Token tidak ditemukan.' });
+      }
+      if (!owner || !repo) {
+        return res.status(400).json({ error: 'Owner dan Repository GitHub belum diatur.' });
+      }
+
+      async function fetchRepoFile(filePath: string): Promise<any | null> {
+        const response = await fetch(
+          `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/vnd.github.v3+json',
+              'User-Agent': 'BintangRemaja-App',
+            },
+          }
+        );
+        if (!response.ok) return null;
+        const fileData = await response.json();
+        if (!fileData.content) return null;
+        const decoded = Buffer.from(fileData.content, 'base64').toString('utf-8');
+        try {
+          return JSON.parse(decoded);
+        } catch {
+          return decoded;
+        }
+      }
+
+      // Try reading combined database or individual files
+      const dbCombined = await fetchRepoFile('data/database.json');
+      const members = (await fetchRepoFile('data/members.json')) || dbCombined?.members || null;
+      const attendance = (await fetchRepoFile('data/attendance.json')) || dbCombined?.attendance || null;
+      const announcements = (await fetchRepoFile('data/announcements.json')) || dbCombined?.announcements || null;
+      const session = (await fetchRepoFile('data/session.json')) || dbCombined?.session || null;
+
+      if (!members && !attendance && !announcements && !session && !dbCombined) {
+        return res.status(404).json({
+          error: `Tidak ditemukan file data JSON di repository "${owner}/${repo}" pada branch "${branch}" (misal: data/members.json atau data/database.json).`,
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Data berhasil ditarik dari repository GitHub!',
+        data: {
+          members: members || [],
+          attendance: attendance || [],
+          announcements: announcements || [],
+          session: session || null,
+        },
+        syncedAt: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error('GitHub Pull Error:', error);
+      return res.status(500).json({ error: 'Gagal menarik data dari GitHub: ' + error.message });
+    }
+  });
+
   // Google Sheets Integration API Endpoint
+
   app.post('/api/sheets/sync', async (req, res) => {
     try {
       const { accessToken, members = [], records = [], sessionTitle = 'Sesi Rutin Karang Taruna', spreadsheetId: inputSpreadsheetId } = req.body;
