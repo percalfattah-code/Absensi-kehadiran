@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Full-bleed background for maskable adaptive clipping -->
+    <linearGradient id="bgGradMaskable" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1b083b" />
+      <stop offset="50%" stop-color="#120426" />
+      <stop offset="100%" stop-color="#090214" />
+    </linearGradient>
+
+    <!-- Star Radiant Gold Gradient -->
+    <linearGradient id="starGoldMask" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="30%" stop-color="#fbbf24" />
+      <stop offset="70%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+
+    <!-- Inner Facet Highlight -->
+    <linearGradient id="facetHighlightMask" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#fef08a" stop-opacity="0.2" />
+    </linearGradient>
+
+    <!-- Ring Neon Gradient -->
+    <linearGradient id="ringNeonMask" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc" />
+      <stop offset="50%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#f43f5e" />
+    </linearGradient>
+
+    <filter id="glowEffectMask" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Full-bleed Solid Background without rounded corners (for maskable adaptive icon standard) -->
+  <rect width="512" height="512" fill="url(#bgGradMaskable)" />
+
+  <!-- Centered Within Safe-Zone (Central 75% circle ~ radius 180) -->
+  <g transform="translate(256, 256) scale(0.8) translate(-256, -256)">
+    <!-- Ambient Neon Ring -->
+    <circle cx="256" cy="256" r="218" fill="none" stroke="url(#ringNeonMask)" stroke-width="16" opacity="0.9" />
+    <circle cx="256" cy="256" r="192" fill="#15072b" opacity="0.85" stroke="#4c1d95" stroke-width="6" />
+
+    <!-- Glow Backdrop for Star -->
+    <circle cx="256" cy="256" r="130" fill="#a855f7" opacity="0.3" filter="url(#glowEffectMask)" />
+
+    <!-- 3D Main Star Geometry -->
+    <g filter="url(#glowEffectMask)">
+      <!-- Base 5-pointed Star -->
+      <polygon points="256,76 304,182 420,194 332,272 358,386 256,328 154,386 180,272 92,194 208,182" fill="url(#starGoldMask)" stroke="#fef08a" stroke-width="3" />
+      
+      <!-- 3D Bevel / Facets for Realistic Depth -->
+      <polygon points="256,76 256,256 208,182" fill="url(#facetHighlightMask)" />
+      <polygon points="256,76 256,256 304,182" fill="#d97706" opacity="0.5" />
+      <polygon points="420,194 256,256 332,272" fill="#b45309" opacity="0.6" />
+      <polygon points="358,386 256,256 256,328" fill="#92400e" opacity="0.7" />
+      <polygon points="154,386 256,256 256,328" fill="#f59e0b" opacity="0.7" />
+      <polygon points="92,194 256,256 180,272" fill="url(#facetHighlightMask)" opacity="0.6" />
+    </g>
+
+    <!-- Central Diamond Core Light -->
+    <polygon points="256,216 276,256 256,296 236,256" fill="#ffffff" opacity="0.9" filter="url(#glowEffectMask)" />
+
+    <!-- Laurel Accent -->
+    <path d="M 130 405 Q 256 465 382 405" fill="none" stroke="#fbbf24" stroke-width="12" stroke-linecap="round" opacity="0.95" />
+    <path d="M 170 422 Q 256 460 342 422" fill="none" stroke="#c084fc" stroke-width="5" stroke-linecap="round" opacity="0.8" />
+  </g>
+</svg>

@@ -59,9 +59,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     onSelectRole('MEMBER');
   };
 
-  const handleTestAudio = () => {
-    audioService.unlock();
-    audioService.speakTestAudio();
+  const handleTestAudio = async () => {
+    await audioService.requestAudioPermissions();
   };
 
   const handleNumpadPress = (val: string) => {

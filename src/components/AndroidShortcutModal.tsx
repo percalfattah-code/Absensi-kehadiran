@@ -34,9 +34,8 @@ export const AndroidShortcutModal: React.FC<AndroidShortcutModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleTestAudio = () => {
-    audioService.unlock();
-    audioService.speakTestAudio();
+  const handleTestAudio = async () => {
+    await audioService.requestAudioPermissions();
     setSoundTested(true);
     setTimeout(() => setSoundTested(false), 4000);
   };

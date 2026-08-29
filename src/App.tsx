@@ -92,6 +92,28 @@ export default function App() {
   useEffect(() => {
     loadData();
 
+    // Parse URL params for Android Shortcut / Homescreen launch
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const targetView = urlParams.get('view');
+      if (targetView) {
+        if (targetView === 'absensi') {
+          setIsLoggedIn(true);
+          setRoleMode('MEMBER');
+          setCurrentView('absensi');
+        } else if (targetView === 'pengumuman') {
+          setIsLoggedIn(true);
+          setCurrentView('pengumuman');
+        } else if (targetView === 'dashboard') {
+          setIsLoggedIn(true);
+          setRoleMode('ADMIN');
+          setCurrentView('dashboard');
+        }
+      }
+    } catch (e) {
+      console.warn('URL param parse error:', e);
+    }
+
     // Listen for online/offline events
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
@@ -105,10 +127,18 @@ export default function App() {
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    const handleAppInstalled = () => {
+      console.log('PWA was installed successfully');
+      setDeferredPrompt(null);
+      setIsInstallModalOpen(false);
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, [loadData]);
 

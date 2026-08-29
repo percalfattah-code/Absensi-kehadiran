@@ -43,9 +43,8 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const isSessionOpen = session?.isOpen ?? false;
 
-  const handleTestSound = () => {
-    audioService.unlock();
-    audioService.speakTestAudio();
+  const handleTestSound = async () => {
+    await audioService.requestAudioPermissions();
   };
 
   const handleOpenShortcutGuide = () => {

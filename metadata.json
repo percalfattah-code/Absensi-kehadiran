@@ -1,6 +1,6 @@
 {
   "name": "BINTANG REMAJA",
   "description": "Sistem Absensi Kehadiran Karang Taruna berbasis Website/PWA dengan Deteksi Wajah Real-time & Liveness Verification",
-  "requestFramePermissions": ["camera"],
+  "requestFramePermissions": ["camera", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

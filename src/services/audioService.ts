@@ -349,6 +349,25 @@ class AudioService {
     }, 300);
   }
 
+  public async requestAudioPermissions(): Promise<boolean> {
+    this.unlock();
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Release the microphone stream tracks right after permission is granted
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      this.playSuccessChime();
+      this.speak('Izin speaker dan mikrofon berhasil diaktifkan.', true, 500);
+      return true;
+    } catch (err) {
+      console.warn('Microphone permission request error or user dismissed:', err);
+      // Even if mic was dismissed, unlock speaker audio context
+      this.playPromptDing();
+      return false;
+    }
+  }
+
   public speakTestAudio(): void {
     this.unlock();
     this.playSuccessChime();

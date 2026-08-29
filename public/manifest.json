@@ -1,18 +1,86 @@
 {
-  "name": "Bintang Remaja",
-  "short_name": "Bintang",
-  "description": "Sistem Absensi Kehadiran Karang Taruna berbasis Web & PWA dengan Liveness Verification",
+  "id": "/",
+  "name": "BINTANG REMAJA - Absensi Karang Taruna",
+  "short_name": "Bintang Remaja",
+  "description": "Sistem Absensi Kehadiran Karang Taruna berbasis Web & PWA dengan Deteksi Wajah Real-time & Liveness Verification.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#1e3a8a",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
+  "background_color": "#0d071a",
+  "theme_color": "#15072b",
   "orientation": "portrait",
+  "lang": "id-ID",
+  "dir": "ltr",
+  "categories": [
+    "productivity",
+    "utilities",
+    "social"
+  ],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/star-logo.svg",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/star-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Absensi Wajah",
+      "short_name": "Absen",
+      "description": "Buka kamera absensi biometrik kehadiran langsung",
+      "url": "/?view=absensi",
+      "icons": [
+        {
+          "src": "/star-logo.svg",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Panel Pengurus",
+      "short_name": "Admin",
+      "description": "Masuk panel kontrol pengurus dan rekap",
+      "url": "/?view=dashboard",
+      "icons": [
+        {
+          "src": "/star-logo.svg",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Pengumuman & Agenda",
+      "short_name": "Agenda",
+      "description": "Lihat info kegiatan dan acara Karang Taruna",
+      "url": "/?view=pengumuman",
+      "icons": [
+        {
+          "src": "/star-logo.svg",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
     }
   ]
 }
