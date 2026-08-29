@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, UserCheck, Star, Camera, AlertCircle, Clock, Plus, CheckCircle2, ShieldCheck, Sparkles, UserX } from 'lucide-react';
 import { Member, AttendanceRecord, AttendanceSession, RoleMode } from '../types';
+import { audioService } from '../services/audioService';
 
 interface MemberSelectProps {
   members: Member[];
@@ -32,7 +33,15 @@ export const MemberSelect: React.FC<MemberSelectProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
+  const handleSelect = (member: Member) => {
+    audioService.unlock();
+    audioService.playPromptDing();
+    onSelectMember(member);
+  };
+
   const handleStart = () => {
+    audioService.unlock();
+    audioService.playPromptDing();
     if (onProceedToCamera) onProceedToCamera();
     else if (onStartAttendance) onStartAttendance();
   };
@@ -151,7 +160,7 @@ export const MemberSelect: React.FC<MemberSelectProps> = ({
                 <motion.button
                   key={member.id}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => onSelectMember(member)}
+                  onClick={() => handleSelect(member)}
                   className={`w-full text-left p-3.5 rounded-2xl transition-all duration-150 flex items-center justify-between ${
                     isSelected
                       ? 'bg-gradient-to-r from-violet-700/90 to-purple-800/90 border border-amber-300 text-white shadow-[0_6px_0_0_#4c1d95,0_10px_20px_rgba(0,0,0,0.5)] translate-y-[-2px]'

@@ -1,7 +1,20 @@
 import React from 'react';
-import { Star, ShieldCheck, Smartphone, Lock, Unlock, UserCheck, FileSpreadsheet, LogOut, Sparkles } from 'lucide-react';
+import {
+  Star,
+  ShieldCheck,
+  Smartphone,
+  Lock,
+  Unlock,
+  UserCheck,
+  FileSpreadsheet,
+  LogOut,
+  Sparkles,
+  Volume2,
+  Download,
+} from 'lucide-react';
 import { AttendanceSession, RoleMode } from '../types';
 import { GoogleSheetsSyncState } from '../services/googleSheets';
+import { audioService } from '../services/audioService';
 
 interface HeaderProps {
   session: AttendanceSession | null;
@@ -29,6 +42,16 @@ export const Header: React.FC<HeaderProps> = ({
   onConnectGoogleSheets,
 }) => {
   const isSessionOpen = session?.isOpen ?? false;
+
+  const handleTestSound = () => {
+    audioService.unlock();
+    audioService.speakTestAudio();
+  };
+
+  const handleOpenShortcutGuide = () => {
+    audioService.unlock();
+    onInstallClick();
+  };
 
   return (
     <header className="bg-[#15072b] text-white border-b border-violet-500/30 sticky top-0 z-40 px-3 sm:px-4 py-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-md">
@@ -76,6 +99,26 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Action Badges & Buttons */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Sound Test Button */}
+          <button
+            onClick={handleTestSound}
+            className="p-2 btn-3d-violet text-amber-300 font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1"
+            title="Tes Suara Notifikasi & Panduan TTS"
+          >
+            <Volume2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline text-[11px]">Tes Suara</span>
+          </button>
+
+          {/* Android Shortcut / Install Button */}
+          <button
+            onClick={handleOpenShortcutGuide}
+            className="flex items-center gap-1 px-2.5 py-1.5 btn-3d-amber text-purple-950 font-black text-xs rounded-xl shadow-md transition-all"
+            title="Panduan Pasang Shortcut Layar Utama Android"
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Shortcut HP</span>
+          </button>
+
           {/* Google Sheets Live Button (Visible in Header) */}
           {sheetsConfig.spreadsheetUrl ? (
             <a
@@ -123,22 +166,12 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Switch Role / Exit to Initial Login Screen Button */}
           <button
             onClick={onLogoutToLoginScreen}
-            className="flex items-center gap-1 px-3 py-1.5 btn-3d-dark text-violet-200 hover:text-white font-bold text-xs rounded-xl transition-all"
+            className="flex items-center gap-1 px-2.5 py-1.5 btn-3d-dark text-violet-200 hover:text-white font-bold text-xs rounded-xl transition-all"
             title="Keluar ke Menu Role Login Awal"
           >
             <LogOut className="w-3.5 h-3.5 text-rose-400" />
             <span className="hidden sm:inline">Ganti Role</span>
           </button>
-
-          {deferredPrompt && (
-            <button
-              onClick={onInstallClick}
-              className="flex items-center gap-1 p-2 btn-3d-violet text-white font-extrabold text-xs rounded-xl shadow-md transition-all"
-              title="Install ke Home Screen Android"
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-            </button>
-          )}
         </div>
       </div>
     </header>

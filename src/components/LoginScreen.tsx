@@ -19,44 +19,53 @@ import {
   Fingerprint,
   Settings,
   Flame,
+  Smartphone,
+  Download,
+  Volume2,
 } from 'lucide-react';
 import { RoleMode } from '../types';
 import { GoogleSheetsSyncState } from '../services/googleSheets';
+import { audioService } from '../services/audioService';
 
 interface LoginScreenProps {
   onSelectRole: (role: RoleMode, adminPinSuccess?: boolean) => void;
   sheetsConfig: GoogleSheetsSyncState;
   onConnectGoogleSheets: () => void;
+  deferredPrompt?: any;
+  onOpenShortcutModal?: () => void;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   onSelectRole,
   sheetsConfig,
   onConnectGoogleSheets,
+  deferredPrompt,
+  onOpenShortcutModal,
 }) => {
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
-  const [showPin, setShowPin] = useState(false);
 
   const handleAdminClick = () => {
+    audioService.unlock();
     setPinInput('');
     setPinError(false);
     setShowPinModal(true);
   };
 
-  const handlePinSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pinInput === '1234') {
-      setShowPinModal(false);
-      onSelectRole('ADMIN', true);
-    } else {
-      setPinError(true);
-      setPinInput('');
-    }
+  const handleMemberClick = () => {
+    audioService.unlock();
+    audioService.playPromptDing();
+    onSelectRole('MEMBER');
+  };
+
+  const handleTestAudio = () => {
+    audioService.unlock();
+    audioService.speakTestAudio();
   };
 
   const handleNumpadPress = (val: string) => {
+    audioService.unlock();
     if (val === 'C') {
       setPinInput('');
       setPinError(false);
@@ -73,11 +82,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setPinError(false);
       if (next.length === 4) {
         if (next === '1234') {
+          audioService.playSuccessChime();
           setTimeout(() => {
             setShowPinModal(false);
             onSelectRole('ADMIN', true);
           }, 200);
         } else {
+          audioService.playErrorBuzzer();
           setPinError(true);
           setTimeout(() => setPinInput(''), 600);
         }
@@ -92,9 +103,47 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       <div className="absolute top-1/3 -right-32 w-96 h-96 bg-fuchsia-600/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute -bottom-36 left-1/4 w-[36rem] h-[36rem] bg-purple-800/20 rounded-full blur-[130px] pointer-events-none" />
 
+      {/* Top Action Ribbon: Shortcut HP & Audio Test */}
+      <div className="max-w-4xl w-full mx-auto relative z-20 flex flex-wrap items-center justify-between gap-2 pt-2">
+        <div className="flex items-center gap-2">
+          <span className="flex h-2.5 w-2.5 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400"></span>
+          </span>
+          <span className="text-[11px] font-extrabold text-amber-300">
+            Karang Taruna Bintang Remaja
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleTestAudio}
+            className="flex items-center gap-1.5 px-3 py-1.5 btn-3d-violet text-amber-300 rounded-xl text-xs font-black shadow-md transition-all"
+            title="Tes Suara Notifikasi & TTS"
+          >
+            <Volume2 className="w-3.5 h-3.5" />
+            <span>Tes Suara 🔊</span>
+          </button>
+
+          {onOpenShortcutModal && (
+            <button
+              onClick={() => {
+                audioService.unlock();
+                onOpenShortcutModal();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 btn-3d-amber text-purple-950 rounded-xl text-xs font-black shadow-md transition-all"
+              title="Perintah Pasang Shortcut Android"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Pasang Shortcut HP 📲</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Top Brand Banner */}
-      <div className="max-w-4xl w-full mx-auto my-auto py-6 sm:py-10 space-y-8 relative z-10">
-        <div className="text-center space-y-4">
+      <div className="max-w-4xl w-full mx-auto my-auto py-6 sm:py-8 space-y-6 relative z-10">
+        <div className="text-center space-y-3">
           {/* Floating 3D Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-950/80 border border-violet-500/40 text-violet-300 text-xs font-black tracking-widest uppercase shadow-[0_4px_12px_rgba(139,92,246,0.3)] backdrop-blur-md">
             <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" style={{ animationDuration: '8s' }} />
@@ -115,13 +164,43 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </p>
         </div>
 
+        {/* ANDROID SHORTCUT PROMPT CALLOUT IN LOGIN SCREEN */}
+        {onOpenShortcutModal && (
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#1b083b] via-[#240c4a] to-[#170633] border border-amber-400/50 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 text-white">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="w-10 h-10 rounded-xl bg-amber-400 text-purple-950 flex items-center justify-center font-black shrink-0 shadow-md">
+                <Smartphone className="w-5 h-5" />
+              </div>
+              <div className="text-left">
+                <div className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                  <span>Perintah Tambah Shortcut HP Android</span>
+                </div>
+                <p className="text-[11px] text-violet-200/90">
+                  Jadikan aplikasi beranda HP agar absensi dan kamera wajah langsung terbuka dalam 1-klik!
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                audioService.unlock();
+                onOpenShortcutModal();
+              }}
+              className="w-full sm:w-auto px-4 py-2 btn-3d-amber text-purple-950 font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 shrink-0"
+            >
+              <Download className="w-3.5 h-3.5 stroke-[3]" />
+              <span>Buka Petunjuk Pasang</span>
+            </button>
+          </div>
+        )}
+
         {/* 2-WAY 3D CARD LOGIN SELECTION */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
           {/* 3D CARD 1: LOGIN ANGGOTA (KHUSUS ABSENSI) */}
           <motion.div
             whileHover={{ y: -6, scale: 1.015 }}
             whileTap={{ scale: 0.985 }}
-            onClick={() => onSelectRole('MEMBER')}
+            onClick={handleMemberClick}
             className="group cursor-pointer card-3d p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:border-violet-400/60"
           >
             {/* Glossy top edge light */}
@@ -159,33 +238,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <span className="truncate">Absensi Biometrik</span>
                 </div>
                 <div className="flex items-center gap-2 bg-violet-950/60 p-2 rounded-xl border border-violet-800/50">
-                  <Zap className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="truncate">Struk Kehadiran</span>
+                  <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="truncate">Lihat Pengumuman</span>
                 </div>
               </div>
             </div>
 
-            <button className="mt-6 w-full py-4 btn-3d-violet text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2">
-              <span>MASUK ABSENSI ANGGOTA</span>
-              <ArrowRight className="w-4 h-4 stroke-[3]" />
+            <button className="mt-6 w-full py-4 btn-3d-violet font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 shadow-lg">
+              <span>MASUK SEBAGAI ANGGOTA</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </motion.div>
 
-          {/* 3D CARD 2: LOGIN ADMIN (KONTROL PENUH) */}
+          {/* 3D CARD 2: LOGIN ADMIN (KONTROL PENUH DENGAN PIN) */}
           <motion.div
             whileHover={{ y: -6, scale: 1.015 }}
             whileTap={{ scale: 0.985 }}
             onClick={handleAdminClick}
-            className="group cursor-pointer card-3d-amber p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:border-amber-400/80"
+            className="group cursor-pointer card-3d p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:border-amber-400/60 border-amber-500/40"
           >
-            {/* Glossy top edge light */}
-            <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/90 to-transparent" />
-            <div className="absolute -top-12 -right-12 w-36 h-36 bg-amber-500/20 rounded-full blur-2xl group-hover:bg-amber-500/35 transition-all" />
+            {/* Glossy amber top edge light */}
+            <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/80 to-transparent" />
+            <div className="absolute -top-12 -right-12 w-36 h-36 bg-amber-500/15 rounded-full blur-2xl group-hover:bg-amber-500/30 transition-all" />
 
             <div className="space-y-4 relative z-10">
               <div className="flex items-center justify-between">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-purple-950 flex items-center justify-center shadow-[0_8px_16px_rgba(245,158,11,0.4)] border border-amber-200/60 group-hover:scale-105 transition-transform">
-                  <ShieldCheck className="w-8 h-8 text-purple-950" />
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-purple-950 flex items-center justify-center shadow-[0_8px_16px_rgba(245,158,11,0.3)] border border-amber-200/60 group-hover:scale-105 transition-transform">
+                  <ShieldCheck className="w-8 h-8 fill-purple-950 text-amber-300" />
                 </div>
                 <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-sm flex items-center gap-1">
                   <Lock className="w-3 h-3" /> PIN Pengurus
@@ -194,7 +273,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
               <div>
                 <div className="text-[11px] font-extrabold uppercase tracking-wider text-amber-300 mb-1 flex items-center gap-1.5">
-                  <Flame className="w-3.5 h-3.5 text-amber-400" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
                   KONTROL PENUH PENGURUS
                 </div>
                 <h2 className="text-2xl font-black text-white group-hover:text-amber-300 transition-colors flex items-center justify-between">

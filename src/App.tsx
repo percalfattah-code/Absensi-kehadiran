@@ -40,10 +40,10 @@ import { MemberManagement } from './components/MemberManagement';
 import { AttendanceLog } from './components/AttendanceLog';
 import { SessionSettings } from './components/SessionSettings';
 import { AnnouncementPanel } from './components/AnnouncementPanel';
-import { InstallPwaModal } from './components/InstallPwaModal';
+import { AndroidShortcutModal } from './components/AndroidShortcutModal';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { LoginScreen } from './components/LoginScreen';
-import { Shield, ShieldCheck, UserCheck, Bell, Lock, Unlock, Megaphone, FileSpreadsheet } from 'lucide-react';
+import { Shield, ShieldCheck, UserCheck, Bell, Lock, Unlock, Megaphone, FileSpreadsheet, Smartphone, Download } from 'lucide-react';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -405,11 +405,23 @@ export default function App() {
   // Show Initial Role Login Screen if user has not selected role/logged in
   if (!isLoggedIn) {
     return (
-      <LoginScreen
-        onSelectRole={handleRoleSelectFromLogin}
-        sheetsConfig={sheetsConfig}
-        onConnectGoogleSheets={handleConnectGoogleSheets}
-      />
+      <>
+        <LoginScreen
+          onSelectRole={handleRoleSelectFromLogin}
+          sheetsConfig={sheetsConfig}
+          onConnectGoogleSheets={handleConnectGoogleSheets}
+          deferredPrompt={deferredPrompt}
+          onOpenShortcutModal={() => setIsInstallModalOpen(true)}
+        />
+        {isInstallModalOpen && (
+          <AndroidShortcutModal
+            isOpen={isInstallModalOpen}
+            onClose={() => setIsInstallModalOpen(false)}
+            deferredPrompt={deferredPrompt}
+            onInstallNative={handleInstallPwa}
+          />
+        )}
+      </>
     );
   }
 
@@ -685,11 +697,13 @@ export default function App() {
         />
       )}
 
-      {/* PWA Install Guide Modal Sheet */}
+      {/* Android Shortcut & PWA Install Guide Modal */}
       {isInstallModalOpen && (
-        <InstallPwaModal
+        <AndroidShortcutModal
+          isOpen={isInstallModalOpen}
           onClose={() => setIsInstallModalOpen(false)}
-          onInstall={handleInstallPwa}
+          deferredPrompt={deferredPrompt}
+          onInstallNative={handleInstallPwa}
         />
       )}
     </div>
