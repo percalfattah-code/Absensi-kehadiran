@@ -244,24 +244,6 @@ export const AndroidShortcutModal: React.FC<AndroidShortcutModalProps> = ({
           </div>
         )}
 
-        {/* AUDIO TEST BUTTON (ALLOWS TESTING SOUND NOTIFICATIONS) */}
-        <div className="p-3 bg-[#15072d] rounded-2xl border border-violet-800 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Volume2 className="w-4 h-4 text-amber-400 shrink-0" />
-            <div className="text-[11px]">
-              <div className="font-bold text-white">Uji Coba Notifikasi Suara</div>
-              <div className="text-[10px] text-violet-300">Pastikan speaker HP menyala</div>
-            </div>
-          </div>
-          <button
-            onClick={handleTestAudio}
-            className="px-3 py-1.5 btn-3d-violet text-amber-300 rounded-xl text-xs font-black flex items-center gap-1.5 shrink-0"
-          >
-            <Volume2 className="w-3.5 h-3.5" />
-            <span>{soundTested ? 'Memutar Suara...' : 'Tes Suara'}</span>
-          </button>
-        </div>
-
         {/* FOOTER ACTIONS */}
         <div className="flex gap-2.5 pt-1">
           <button

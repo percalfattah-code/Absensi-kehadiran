@@ -98,16 +98,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Action Badges & Buttons */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Sound Test Button */}
-          <button
-            onClick={handleTestSound}
-            className="p-2 btn-3d-violet text-amber-300 font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1"
-            title="Tes Suara Notifikasi & Panduan TTS"
-          >
-            <Volume2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline text-[11px]">Tes Suara</span>
-          </button>
-
           {/* Mode Switcher Button */}
           {roleMode === 'ADMIN' ? (
             <button

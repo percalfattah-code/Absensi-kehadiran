@@ -548,19 +548,6 @@ export const CameraView: React.FC<CameraViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Sound / TTS Voice Guide Toggle */}
-          <button
-            onClick={() => setIsSoundMuted(!isSoundMuted)}
-            className={`p-2 rounded-xl border text-xs font-bold transition-all ${
-              isSoundMuted
-                ? 'btn-3d-dark text-violet-400'
-                : 'btn-3d-violet text-amber-300'
-            }`}
-            title={isSoundMuted ? 'Nyalakan Suara Panduan TTS' : 'Matikan Suara TTS'}
-          >
-            {isSoundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-amber-300" />}
-          </button>
-
           {/* Multi-camera device selector toggle */}
           {availableDevices.length > 1 && (
             <button

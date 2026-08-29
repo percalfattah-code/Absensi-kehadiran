@@ -96,35 +96,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#0d071a] text-violet-50 flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden font-sans select-none">
+    <div className="min-h-screen bg-[#0d071a] text-violet-50 flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden font-['Poppins',sans-serif] select-none">
       {/* 3D Radiant Ambient Glows */}
       <div className="absolute -top-36 -left-36 w-[32rem] h-[32rem] bg-violet-600/25 rounded-full blur-[110px] pointer-events-none" />
       <div className="absolute top-1/3 -right-32 w-96 h-96 bg-fuchsia-600/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute -bottom-36 left-1/4 w-[36rem] h-[36rem] bg-purple-800/20 rounded-full blur-[130px] pointer-events-none" />
-
-      {/* Top Action Ribbon: Shortcut HP & Audio Test */}
-      <div className="max-w-4xl w-full mx-auto relative z-20 flex flex-wrap items-center justify-between gap-2 pt-2">
-        <div className="flex items-center gap-2">
-          <span className="flex h-2.5 w-2.5 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400"></span>
-          </span>
-          <span className="text-[11px] font-extrabold text-amber-300">
-            Karang Taruna Bintang Remaja
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleTestAudio}
-            className="flex items-center gap-1.5 px-3 py-1.5 btn-3d-violet text-amber-300 rounded-xl text-xs font-black shadow-md transition-all"
-            title="Tes Suara Notifikasi & TTS"
-          >
-            <Volume2 className="w-3.5 h-3.5" />
-            <span>Tes Suara 🔊</span>
-          </button>
-        </div>
-      </div>
 
       {/* Top Brand Banner */}
       <div className="max-w-4xl w-full mx-auto my-auto py-6 sm:py-8 space-y-6 relative z-10">

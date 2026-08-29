@@ -457,7 +457,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b0217] text-white flex flex-col font-sans selection:bg-violet-600 selection:text-white">
+    <div className="min-h-screen bg-[#0b0217] text-white flex flex-col font-['Poppins',sans-serif] selection:bg-violet-600 selection:text-white">
       {/* Running Marquee Banner across Admin & Member Views */}
       <RunningMarquee />
 
