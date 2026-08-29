@@ -98,11 +98,21 @@ export const CameraView: React.FC<CameraViewProps> = ({
   const isCapturingRef = useRef<boolean>(false);
   const eyeClosedRef = useRef<boolean>(false);
   const lastTaskSpokenRef = useRef<string>('');
+  const hasTriggeredMismatchAlarmRef = useRef<boolean>(false);
+  const consecutiveMismatchFramesRef = useRef<number>(0);
+  const matchPercentageHistoryRef = useRef<number[]>([]);
+  const [currentMatchScore, setCurrentMatchScore] = useState<number | null>(null);
   const [refFeatureVector, setRefFeatureVector] = useState<number[] | null>(member.faceLandmarks || null);
   const [mismatchError, setMismatchError] = useState<string | null>(null);
 
-  // Load reference vector from avatarUrl if faceLandmarks is missing
+  // Reset mismatch alarm state and load reference vector when member changes
   useEffect(() => {
+    hasTriggeredMismatchAlarmRef.current = false;
+    consecutiveMismatchFramesRef.current = 0;
+    matchPercentageHistoryRef.current = [];
+    setCurrentMatchScore(null);
+    setMismatchError(null);
+
     if (member.faceLandmarks && member.faceLandmarks.length > 0) {
       setRefFeatureVector(member.faceLandmarks);
     } else if (member.avatarUrl) {
@@ -300,24 +310,46 @@ export const CameraView: React.FC<CameraViewProps> = ({
               const liveVector = extractFacialFeatureVector(landmarks);
               const { isMatch, matchPercentage } = compareFaceLandmarkFeatures(liveVector, refFeatureVector);
 
-              if (!isMatch) {
-                const errMsg = `Wajah tidak sesuai dengan foto anggota ${member.name} (${matchPercentage}% kecocokan)`;
-                setMismatchError(errMsg);
-                setStatusMessage(`⛔ WAJAH DITOLAK! Bukan wajah anggota ${member.name}`);
-                
-                // Voice warning: wajah tidak sesuai
-                if (!isSoundMuted) {
-                  audioService.speakFaceMismatch(member.name);
-                }
+              // Maintain rolling history of last 5 frames for stable, flicker-free similarity display
+              matchPercentageHistoryRef.current.push(matchPercentage);
+              if (matchPercentageHistoryRef.current.length > 5) {
+                matchPercentageHistoryRef.current.shift();
+              }
+              const smoothedPercentage = Math.round(
+                matchPercentageHistoryRef.current.reduce((a, b) => a + b, 0) /
+                  matchPercentageHistoryRef.current.length
+              );
+              setCurrentMatchScore(smoothedPercentage);
 
-                drawFaceLandmarks(ctx, landmarks, canvas.width, canvas.height, '#F43F5E');
-                setProgress((prev) => ({ ...prev, faceDetected: true, singleFace: true }));
-                
-                if (!isCapturingRef.current) {
-                  animFrameId = requestAnimationFrame(analyzeFrame);
+              if (!isMatch) {
+                consecutiveMismatchFramesRef.current += 1;
+
+                // Confirm mismatch after 3 consecutive frames to filter temporary landmark jitter
+                if (consecutiveMismatchFramesRef.current >= 3) {
+                  const errMsg = `Wajah tidak sesuai dengan foto anggota ${member.name} (${smoothedPercentage}% kecocokan)`;
+                  setMismatchError(errMsg);
+                  setStatusMessage(`⛔ WAJAH TIDAK SESUAI (${smoothedPercentage}% Cocok)`);
+
+                  // Voice & Buzzer Warning: ONLY FIRES ONCE per mismatch occurrence!
+                  if (!hasTriggeredMismatchAlarmRef.current) {
+                    hasTriggeredMismatchAlarmRef.current = true;
+                    if (!isSoundMuted) {
+                      audioService.speakFaceMismatch(member.name);
+                    }
+                  }
+
+                  drawFaceLandmarks(ctx, landmarks, canvas.width, canvas.height, '#F43F5E');
+                  setProgress((prev) => ({ ...prev, faceDetected: true, singleFace: true }));
+
+                  if (!isCapturingRef.current) {
+                    animFrameId = requestAnimationFrame(analyzeFrame);
+                  }
+                  return; // BLOCK verification for different person!
                 }
-                return; // BLOCK verification for different person!
               } else {
+                // Face matches reference identity! Reset mismatch alarm state
+                consecutiveMismatchFramesRef.current = 0;
+                hasTriggeredMismatchAlarmRef.current = false;
                 setMismatchError(null);
               }
             }
@@ -804,7 +836,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
           </div>
 
           <div
-            className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
+            className={`p-2.5 rounded-xl border flex items-center justify-between gap-1.5 transition-all ${
               refFeatureVector && !mismatchError && progress.faceDetected
                 ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
                 : mismatchError
@@ -812,16 +844,27 @@ export const CameraView: React.FC<CameraViewProps> = ({
                 : 'bg-[#110526] border-violet-800/60 text-violet-500'
             }`}
           >
-            <CheckCircle2
-              className={`w-4 h-4 ${
-                refFeatureVector && !mismatchError && progress.faceDetected
-                  ? 'text-emerald-400'
-                  : mismatchError
-                  ? 'text-rose-400'
-                  : 'text-violet-700'
-              }`}
-            />
-            <span>Kecocokan Identitas</span>
+            <div className="flex items-center gap-2 truncate">
+              <CheckCircle2
+                className={`w-4 h-4 shrink-0 ${
+                  refFeatureVector && !mismatchError && progress.faceDetected
+                    ? 'text-emerald-400'
+                    : mismatchError
+                    ? 'text-rose-400'
+                    : 'text-violet-700'
+                }`}
+              />
+              <span className="truncate">Kecocokan Identitas</span>
+            </div>
+            {currentMatchScore !== null && progress.faceDetected && (
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
+                !mismatchError
+                  ? 'bg-emerald-900/80 text-emerald-300 border border-emerald-500/40'
+                  : 'bg-rose-900/80 text-rose-300 border border-rose-500/40'
+              }`}>
+                {currentMatchScore}%
+              </span>
+            )}
           </div>
 
           <div
