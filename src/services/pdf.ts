@@ -130,6 +130,7 @@ export async function generateAttendancePdf(
     tableData.push([
       i + 1,
       member.name,
+      member.position || 'Anggota',
       jamText,
       statusText,
       '' // Placeholder for image
@@ -139,7 +140,7 @@ export async function generateAttendancePdf(
   // Generate Table using AutoTable
   autoTable(doc, {
     startY: 42,
-    head: [['No', 'Nama Anggota', 'Waktu', 'Status', 'Foto']],
+    head: [['No', 'Nama Anggota', 'Jabatan', 'Waktu', 'Status', 'Foto']],
     body: tableData,
     theme: 'grid',
     headStyles: {
@@ -155,15 +156,16 @@ export async function generateAttendancePdf(
       valign: 'middle',
     },
     columnStyles: {
-      0: { cellWidth: 12, halign: 'center' },
-      1: { cellWidth: 70 },
-      2: { cellWidth: 30, halign: 'center' },
-      3: { cellWidth: 32, halign: 'center' },
-      4: { cellWidth: 30, halign: 'center' },
+      0: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 52 },
+      2: { cellWidth: 38 },
+      3: { cellWidth: 26, halign: 'center' },
+      4: { cellWidth: 28, halign: 'center' },
+      5: { cellWidth: 28, halign: 'center' },
     },
     didDrawCell: (data) => {
-      // Draw image in column 4 for body rows
-      if (data.section === 'body' && data.column.index === 4) {
+      // Draw image in column 5 for body rows
+      if (data.section === 'body' && data.column.index === 5) {
         const rowIndex = data.row.index;
         const imgData = imageMap.get(rowIndex);
         if (imgData) {
@@ -180,7 +182,7 @@ export async function generateAttendancePdf(
       }
     },
     didParseCell: (data) => {
-      if (data.section === 'body' && data.column.index === 3) {
+      if (data.section === 'body' && data.column.index === 4) {
         const status = data.cell.raw as string;
         if (status === 'HADIR') {
           data.cell.styles.textColor = [16, 185, 129]; // emerald green
@@ -268,9 +270,15 @@ export async function generateSingleAttendanceReceiptPdf(
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Nama Anggota: ${record.name}`, 8, 37);
-  doc.text(`Tanggal : ${record.date}`, 8, 43);
-  doc.text(`Jam Absensi : ${record.time} WIB`, 8, 49);
+  doc.text(`Nama Anggota: ${record.name}`, 8, 36);
+  if (record.position) {
+    doc.text(`Jabatan : ${record.position}`, 8, 41);
+    doc.text(`Tanggal : ${record.date}`, 8, 46);
+    doc.text(`Jam Absensi : ${record.time} WIB`, 8, 51);
+  } else {
+    doc.text(`Tanggal : ${record.date}`, 8, 42);
+    doc.text(`Jam Absensi : ${record.time} WIB`, 8, 48);
+  }
 
   doc.setFont('helvetica', 'bold');
   if (record.status === 'HADIR') {
@@ -278,7 +286,7 @@ export async function generateSingleAttendanceReceiptPdf(
   } else {
     doc.setTextColor(245, 158, 11);
   }
-  doc.text(`Status: ${record.status}`, 8, 55);
+  doc.text(`Status: ${record.status}`, 8, 57);
 
   // Embed Photo if available
   if (record.photoBlob) {

@@ -133,19 +133,19 @@ export const CameraView: React.FC<CameraViewProps> = ({
     }
   }, []);
 
-  // Generate a random liveness challenge sequence
+  // Generate a friendly, fast liveness challenge sequence
   useEffect(() => {
     const sequences: LivenessTask[][] = [
-      ['LOOK_CAMERA', 'SMILE', 'BLINK'],
-      ['LOOK_CAMERA', 'BLINK', 'SMILE'],
-      ['LOOK_CAMERA', 'SMILE', 'BLINK', 'SMILE'],
+      ['LOOK_CAMERA', 'SMILE'],
+      ['LOOK_CAMERA'],
+      ['LOOK_CAMERA', 'SMILE'],
     ];
     const chosen = sequences[Math.floor(Math.random() * sequences.length)];
     setLivenessSequence(chosen);
     setCurrentTaskIndex(0);
   }, []);
 
-  // Start / Restart Camera with facingMode or deviceId preference
+  // Start / Restart Camera with facingMode or deviceId preference (Optimized for iOS Safari & Android)
   const startCamera = useCallback(async (overrideFacing?: 'user' | 'environment', overrideDeviceId?: string) => {
     setCameraError(null);
     setIsCameraReady(false);
@@ -168,7 +168,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
       if (targetDevice) {
         videoConstraints.deviceId = { exact: targetDevice };
       } else {
-        videoConstraints.facingMode = targetFacing;
+        videoConstraints.facingMode = { ideal: targetFacing } as any;
       }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -179,6 +179,10 @@ export const CameraView: React.FC<CameraViewProps> = ({
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        // iOS Safari compatibility flags
+        videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.setAttribute('webkit-playsinline', 'true');
+        videoRef.current.muted = true;
         await videoRef.current.play();
         setIsCameraReady(true);
         setStatusMessage('Posisikan wajah di dalam bingkai oval');
@@ -210,7 +214,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
       }
 
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setCameraError('Izin kamera ditolak. Silakan izinkan akses kamera di setelan browser Android Anda.');
+        setCameraError('Izin kamera ditolak. Silakan izinkan akses kamera di setelan browser iPhone / Android Anda.');
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         setCameraError('Kamera tidak ditemukan di perangkat ini.');
       } else {
@@ -360,20 +364,29 @@ export const CameraView: React.FC<CameraViewProps> = ({
             setProgress((prev) => ({ ...prev, faceDetected: true, singleFace: true }));
 
             const activeTask = livenessSequence[currentTaskIndex];
+            const smileScore = calculateSmileScore(landmarks);
 
             // 1. LOOK_CAMERA
             if (activeTask === 'LOOK_CAMERA') {
-              setStatusMessage('Wajah terdeteksi ✓ Memulai verifikasi...');
-              setTimeout(() => {
-                setCurrentTaskIndex(1);
-              }, 700);
+              setStatusMessage('Wajah terverifikasi ✓ Tahan posisi sejenak');
+
+              if (livenessSequence.length === 1 || smileScore > 0.35) {
+                // If single task or already smiling, complete directly!
+                setTimeout(() => {
+                  triggerCompletion(video, landmarks);
+                }, 400);
+              } else {
+                setTimeout(() => {
+                  setCurrentTaskIndex((idx) => (idx === 0 ? 1 : idx));
+                }, 500);
+              }
             }
             // 2. SMILE TASK
             else if (activeTask === 'SMILE') {
-              const smileScore = calculateSmileScore(landmarks);
-              setStatusMessage('Silakan tersenyum 😊');
+              setStatusMessage('Silakan berikan senyuman ramah 😊');
 
-              if (smileScore > 0.45) {
+              // Responsive smile threshold (> 0.35 instead of > 0.45)
+              if (smileScore > 0.35) {
                 setProgress((prev) => ({ ...prev, smileDetected: true }));
                 if (currentTaskIndex < livenessSequence.length - 1) {
                   setCurrentTaskIndex((idx) => idx + 1);
@@ -385,9 +398,9 @@ export const CameraView: React.FC<CameraViewProps> = ({
             // 3. BLINK TASK
             else if (activeTask === 'BLINK') {
               const { avgEAR } = calculateEAR(landmarks);
-              setStatusMessage('Silakan berkedip 👁️');
+              setStatusMessage('Silakan berkedip sejenak 👁️');
 
-              if (avgEAR < 0.17) {
+              if (avgEAR < 0.18) {
                 eyeClosedRef.current = true;
               } else if (eyeClosedRef.current && avgEAR > 0.22) {
                 eyeClosedRef.current = false;

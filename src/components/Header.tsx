@@ -108,39 +108,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline text-[11px]">Tes Suara</span>
           </button>
 
-          {/* Android Shortcut / Install Button */}
-          <button
-            onClick={handleOpenShortcutGuide}
-            className="flex items-center gap-1 px-2.5 py-1.5 btn-3d-amber text-purple-950 font-black text-xs rounded-xl shadow-md transition-all"
-            title="Panduan Pasang Shortcut Layar Utama Android"
-          >
-            <Smartphone className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Shortcut HP</span>
-          </button>
-
-          {/* Google Sheets Live Button (Visible in Header) */}
-          {sheetsConfig.spreadsheetUrl ? (
-            <a
-              href={sheetsConfig.spreadsheetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 px-3 py-1.5 btn-3d-emerald text-white font-black text-xs rounded-xl transition-all"
-              title="Buka Spreadsheet di Google Sheets"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Google Sheet 📊</span>
-            </a>
-          ) : roleMode === 'ADMIN' ? (
-            <button
-              onClick={onConnectGoogleSheets}
-              className="flex items-center gap-1 px-3 py-1.5 btn-3d-dark text-emerald-400 font-bold text-xs rounded-xl transition-all"
-              title="Hubungkan Google Sheets"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">+ Google Sheet</span>
-            </button>
-          ) : null}
-
           {/* Mode Switcher Button */}
           {roleMode === 'ADMIN' ? (
             <button

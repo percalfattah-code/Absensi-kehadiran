@@ -59,6 +59,7 @@ export const MemberSelect: React.FC<MemberSelectProps> = ({
       (m) =>
         m.isActive &&
         (m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (m.position && m.position.toLowerCase().includes(searchQuery.toLowerCase())) ||
           (m.memberNumber && m.memberNumber.toLowerCase().includes(searchQuery.toLowerCase())))
     );
   }, [members, searchQuery]);
@@ -181,8 +182,19 @@ export const MemberSelect: React.FC<MemberSelectProps> = ({
                     </div>
 
                     <div>
-                      <div className="font-extrabold text-sm flex items-center gap-2">
+                      <div className="font-extrabold text-sm flex items-center gap-2 flex-wrap">
                         <span>{member.name}</span>
+                        {member.position && (
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${
+                            isSelected
+                              ? 'bg-amber-400 text-purple-950 border-amber-300'
+                              : member.position.toLowerCase().includes('ketua')
+                              ? 'bg-amber-400/20 text-amber-300 border-amber-400/40'
+                              : 'bg-violet-800/40 text-violet-200 border-violet-600/40'
+                          }`}>
+                            {member.position}
+                          </span>
+                        )}
                         {member.avatarUrl && (
                           <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/40">
                             Foto ✓
@@ -226,10 +238,13 @@ export const MemberSelect: React.FC<MemberSelectProps> = ({
             <div className="flex items-center justify-between border-b border-violet-800/60 pb-3">
               <div>
                 <span className="text-[11px] text-violet-300 uppercase tracking-wider font-bold">Anggota Terpilih:</span>
-                <div className="text-xl font-black text-white flex items-center gap-2 mt-0.5">
+                <div className="text-xl font-black text-white flex items-center gap-2 mt-0.5 flex-wrap">
                   <span className="text-amber-300">{selectedMember.name}</span>
-                  <span className="text-[11px] font-extrabold text-violet-200 bg-violet-900/80 px-2.5 py-0.5 rounded-full border border-violet-600">
-                    {selectedMember.memberNumber || 'Anggota'}
+                  <span className="text-[11px] font-extrabold text-amber-200 bg-amber-950/80 px-2.5 py-0.5 rounded-full border border-amber-400/50">
+                    {selectedMember.position || 'Anggota'}
+                  </span>
+                  <span className="text-[11px] font-mono text-violet-300 bg-violet-900/60 px-2.5 py-0.5 rounded-full border border-violet-700/60">
+                    {selectedMember.memberNumber || 'Tanpa ID'}
                   </span>
                 </div>
               </div>

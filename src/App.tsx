@@ -296,6 +296,7 @@ export default function App() {
       id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       memberId: selectedMember.id,
       name: selectedMember.name,
+      position: selectedMember.position,
       date: dateStr,
       time: timeStr,
       status: status,

@@ -49,10 +49,24 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
 
   // Form fields
   const [nameInput, setNameInput] = useState('');
+  const [positionInput, setPositionInput] = useState('Anggota');
   const [memberNumInput, setMemberNumInput] = useState('');
   const [avatarUrlInput, setAvatarUrlInput] = useState<string>('');
   const [faceLandmarksInput, setFaceLandmarksInput] = useState<number[] | undefined>(undefined);
   const [isActiveInput, setIsActiveInput] = useState(true);
+
+  // Quick preset positions for Karang Taruna
+  const presetPositions = [
+    'Ketua',
+    'Wakil Ketua',
+    'Sekretaris',
+    'Bendahara',
+    'Seksi Humas',
+    'Seksi Olahraga & Seni',
+    'Seksi Perlengkapan',
+    'Seksi Kerohanian',
+    'Anggota',
+  ];
 
   // Camera snapshot state
   const [isCapturingCam, setIsCapturingCam] = useState(false);
@@ -65,12 +79,14 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
   const filteredMembers = members.filter(
     (m) =>
       m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (m.position && m.position.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (m.memberNumber && m.memberNumber.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const handleOpenAdd = () => {
     setEditingMember(null);
     setNameInput('');
+    setPositionInput('Anggota');
     setMemberNumInput(`KTR-${String(members.length + 1).padStart(3, '0')}`);
     setAvatarUrlInput('');
     setFaceLandmarksInput(undefined);
@@ -82,6 +98,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
   const handleOpenEdit = (m: Member) => {
     setEditingMember(m);
     setNameInput(m.name);
+    setPositionInput(m.position || 'Anggota');
     setMemberNumInput(m.memberNumber || '');
     setAvatarUrlInput(m.avatarUrl || '');
     setFaceLandmarksInput(m.faceLandmarks);
@@ -162,6 +179,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
       await onUpdateMember({
         ...editingMember,
         name: nameInput.trim(),
+        position: positionInput.trim() || 'Anggota',
         memberNumber: memberNumInput.trim(),
         avatarUrl: avatarUrlInput || undefined,
         faceLandmarks: faceLandmarksInput,
@@ -170,6 +188,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
     } else {
       await onAddMember({
         name: nameInput.trim(),
+        position: positionInput.trim() || 'Anggota',
         memberNumber: memberNumInput.trim(),
         avatarUrl: avatarUrlInput || undefined,
         faceLandmarks: faceLandmarksInput,
@@ -193,7 +212,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-white">Kelola Data Anggota</h2>
           <p className="text-xs text-violet-200/80 mt-1">
-            Daftar profil, nomor induk & foto referensi biometrik wajah anggota.
+            Daftar profil, jabatan kepengurusan, nomor induk & foto biometrik wajah.
           </p>
         </div>
 
@@ -216,7 +235,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari nama anggota atau nomor induk..."
+            placeholder="Cari nama, jabatan (Ketua, Sekretaris...), atau nomor induk..."
             className="w-full bg-[#110526] text-white placeholder-violet-400/60 text-xs pl-10 pr-4 py-3 rounded-xl border border-violet-700/60 focus:outline-none focus:border-violet-400 transition-all shadow-inner"
           />
         </div>
@@ -231,6 +250,8 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
         ) : (
           filteredMembers.map((member) => {
             const memberRecords = records.filter((r) => r.memberId === member.id);
+            const isLeader = member.position?.toLowerCase().includes('ketua');
+            const isSecretaryOrTreasurer = member.position?.toLowerCase().includes('sekretaris') || member.position?.toLowerCase().includes('bendahara');
 
             return (
               <div
@@ -247,9 +268,27 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-extrabold text-sm text-white truncate">{member.name}</h4>
-                      <span className={`px-2 py-0.5 text-[9px] font-black rounded-full border ${
+                    <div className="flex items-start justify-between gap-1">
+                      <div className="min-w-0">
+                        <h4 className="font-extrabold text-sm text-white truncate">{member.name}</h4>
+                        {/* Jabatan Badge */}
+                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                          <span className={`px-2 py-0.5 text-[10px] font-black rounded-lg border ${
+                            isLeader
+                              ? 'bg-amber-400/20 text-amber-300 border-amber-400/50'
+                              : isSecretaryOrTreasurer
+                              ? 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/50'
+                              : 'bg-violet-800/40 text-violet-200 border-violet-600/50'
+                          }`}>
+                            {member.position || 'Anggota'}
+                          </span>
+                          <span className="text-[10px] text-violet-400 font-mono">
+                            {member.memberNumber || 'Tanpa ID'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <span className={`px-2 py-0.5 text-[9px] font-black rounded-full border shrink-0 ${
                         member.isActive
                           ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
                           : 'bg-rose-950/80 text-rose-300 border-rose-500/40'
@@ -258,11 +297,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-violet-300 font-mono mt-0.5">
-                      {member.memberNumber || 'Tanpa ID'}
-                    </div>
-
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center gap-2 mt-2.5">
                       {member.avatarUrl ? (
                         <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-500/30 flex items-center gap-1">
                           <Fingerprint className="w-3 h-3" /> Biometrik Siap
@@ -351,6 +386,35 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({
                     placeholder="Contoh: Muhammad Rizky"
                     className="w-full bg-[#110526] text-white p-3 rounded-xl border border-violet-700/60 focus:outline-none focus:border-violet-400"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-violet-300 font-extrabold mb-1">Jabatan / Posisi Kepengurusan *</label>
+                  <input
+                    type="text"
+                    required
+                    value={positionInput}
+                    onChange={(e) => setPositionInput(e.target.value)}
+                    placeholder="Contoh: Ketua, Sekretaris, Seksi Humas, Anggota..."
+                    className="w-full bg-[#110526] text-white p-3 rounded-xl border border-violet-700/60 focus:outline-none focus:border-violet-400 font-medium"
+                  />
+                  {/* Preset quick buttons */}
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {presetPositions.map((pos) => (
+                      <button
+                        key={pos}
+                        type="button"
+                        onClick={() => setPositionInput(pos)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                          positionInput === pos
+                            ? 'bg-amber-400 text-purple-950 shadow-sm border border-amber-300'
+                            : 'bg-violet-950/80 text-violet-300 border border-violet-800/80 hover:bg-violet-900'
+                        }`}
+                      >
+                        {pos}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>

@@ -3,6 +3,7 @@ export type AttendanceStatus = 'HADIR' | 'TERLAMBAT' | 'TIDAK HADIR';
 export interface Member {
   id: string;
   name: string;
+  position?: string; // Jabatan: e.g. Ketua, Wakil Ketua, Sekretaris, Bendahara, Seksi Humas, Anggota
   memberNumber?: string;
   avatarUrl?: string; // Data URL or Blob URL of reference face photo
   faceLandmarks?: number[]; // Feature vector array extracted from reference photo
@@ -14,6 +15,7 @@ export interface AttendanceRecord {
   id: string;
   memberId: string;
   name: string;
+  position?: string; // Jabatan anggota saat absensi
   date: string; // DD/MM/YYYY
   time: string; // HH:MM:SS
   status: AttendanceStatus;

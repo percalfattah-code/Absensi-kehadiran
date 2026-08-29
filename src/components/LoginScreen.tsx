@@ -123,20 +123,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <Volume2 className="w-3.5 h-3.5" />
             <span>Tes Suara 🔊</span>
           </button>
-
-          {onOpenShortcutModal && (
-            <button
-              onClick={() => {
-                audioService.unlock();
-                onOpenShortcutModal();
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 btn-3d-amber text-purple-950 rounded-xl text-xs font-black shadow-md transition-all"
-              title="Perintah Pasang Shortcut Android"
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Pasang Shortcut HP 📲</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -162,36 +148,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             Pilih jalur akses login: <b className="text-violet-300">Anggota</b> untuk verifikasi kehadiran wajah, atau <b className="text-amber-300">Admin</b> untuk kendali penuh aplikasi.
           </p>
         </div>
-
-        {/* ANDROID SHORTCUT PROMPT CALLOUT IN LOGIN SCREEN */}
-        {onOpenShortcutModal && (
-          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#1b083b] via-[#240c4a] to-[#170633] border border-amber-400/50 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 text-white">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="w-10 h-10 rounded-xl bg-amber-400 text-purple-950 flex items-center justify-center font-black shrink-0 shadow-md">
-                <Smartphone className="w-5 h-5" />
-              </div>
-              <div className="text-left">
-                <div className="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                  <span>Perintah Tambah Shortcut HP Android</span>
-                </div>
-                <p className="text-[11px] text-violet-200/90">
-                  Jadikan aplikasi beranda HP agar absensi dan kamera wajah langsung terbuka dalam 1-klik!
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                audioService.unlock();
-                onOpenShortcutModal();
-              }}
-              className="w-full sm:w-auto px-4 py-2 btn-3d-amber text-purple-950 font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 shrink-0"
-            >
-              <Download className="w-3.5 h-3.5 stroke-[3]" />
-              <span>Buka Petunjuk Pasang</span>
-            </button>
-          </div>
-        )}
 
         {/* 2-WAY 3D CARD LOGIN SELECTION */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
@@ -302,54 +258,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <span>MASUK PANEL PENGURUS (PIN)</span>
             </button>
           </motion.div>
-        </div>
-
-        {/* 3D GOOGLE SHEETS CLOUD PERSISTENCE CARD */}
-        <div className="card-3d-subtle p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-900/40 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(16,185,129,0.2)]">
-              <FileSpreadsheet className="w-7 h-7" />
-            </div>
-            <div className="space-y-1 text-left">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-extrabold text-white">Fullstack Google Sheets Storage</span>
-                {sheetsConfig.isConnected ? (
-                  <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black rounded-full flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Terhubung
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-0.5 bg-violet-500/20 text-violet-300 border border-violet-500/40 text-[10px] font-black rounded-full">
-                    Siap Sinkron
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-violet-300/70">
-                Penyimpanan cloud otomatis terintegrasi. Rekap kehadiran dan biodata anggota dapat diekspor langsung ke spreadsheet.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-            {sheetsConfig.spreadsheetUrl ? (
-              <a
-                href={sheetsConfig.spreadsheetUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full sm:w-auto px-5 py-3 btn-3d-emerald text-white rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 uppercase tracking-wide"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                <span>Buka Google Sheet 📊</span>
-              </a>
-            ) : (
-              <button
-                onClick={onConnectGoogleSheets}
-                className="w-full sm:w-auto px-5 py-3 btn-3d-dark text-violet-200 hover:text-white rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 uppercase tracking-wide"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-                <span>Hubungkan Google Sheets</span>
-              </button>
-            )}
-          </div>
         </div>
       </div>
 

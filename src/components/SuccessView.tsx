@@ -120,7 +120,14 @@ export const SuccessView: React.FC<SuccessViewProps> = ({
           <div className="space-y-2.5 text-xs text-violet-200">
             <div>
               <div className="text-violet-400/80 text-[11px] font-medium">Nama Anggota:</div>
-              <div className="font-black text-base text-white">{record.name}</div>
+              <div className="font-black text-base text-white flex items-center gap-2 flex-wrap">
+                <span>{record.name}</span>
+                {(record.position || member?.position) && (
+                  <span className="px-2 py-0.5 bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black rounded-lg">
+                    {record.position || member?.position}
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-2 text-violet-200">

@@ -47,7 +47,9 @@ export const AttendanceLog: React.FC<AttendanceLogProps> = ({
   // Filtered Records
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
-      const matchesName = r.name.toLowerCase().includes(searchName.toLowerCase());
+      const matchesName =
+        r.name.toLowerCase().includes(searchName.toLowerCase()) ||
+        (r.position && r.position.toLowerCase().includes(searchName.toLowerCase()));
       const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
       return matchesName && matchesStatus;
     });
@@ -173,7 +175,14 @@ export const AttendanceLog: React.FC<AttendanceLogProps> = ({
                 </div>
 
                 <div>
-                  <div className="font-extrabold text-sm text-white">{r.name}</div>
+                  <div className="font-extrabold text-sm text-white flex items-center gap-2 flex-wrap">
+                    <span>{r.name}</span>
+                    {r.position && (
+                      <span className="px-2 py-0.5 bg-violet-800/40 text-violet-200 border border-violet-600/40 text-[10px] font-black rounded-lg">
+                        {r.position}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-[11px] text-violet-300/80 font-mono mt-0.5">
                     {r.date} • {r.time} WIB
                   </div>
@@ -227,7 +236,14 @@ export const AttendanceLog: React.FC<AttendanceLogProps> = ({
               <X className="w-4 h-4" />
             </button>
 
-            <h3 className="font-black text-base text-white">{previewPhoto.record.name}</h3>
+            <div>
+              <h3 className="font-black text-base text-white">{previewPhoto.record.name}</h3>
+              {previewPhoto.record.position && (
+                <span className="inline-block mt-1 px-2.5 py-0.5 bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black rounded-lg">
+                  {previewPhoto.record.position}
+                </span>
+              )}
+            </div>
             <div className="w-64 h-64 mx-auto rounded-2xl overflow-hidden border-2 border-amber-400 shadow-xl bg-black">
               <img src={previewPhoto.url} alt="Bukti Foto" className="w-full h-full object-cover" />
             </div>

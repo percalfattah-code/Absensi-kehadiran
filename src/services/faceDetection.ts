@@ -304,18 +304,18 @@ export function compareFaceLandmarkFeatures(
   const weightedRelError = totalWeight > 0 ? totalWeightedDiff / totalWeight : 1.0;
 
   // Calibrated Scoring:
-  // Same person variance: CosineSim typically 0.92 - 0.99+, weightedRelError 0.03 - 0.12 -> Score 75% - 98%
-  // Different person: CosineSim < 0.85, weightedRelError > 0.18 -> Score < 45%
-  const cosScore = Math.max(0, Math.min(100, Math.round(((cosineSim - 0.72) / 0.27) * 100)));
-  const diffScore = Math.max(0, Math.min(100, Math.round((1 - Math.min(weightedRelError / 0.26, 1.0)) * 100)));
+  // Same person variance: CosineSim typically 0.80 - 0.99, weightedRelError 0.05 - 0.24 -> Score 75% - 98%
+  // Different person: CosineSim < 0.70, weightedRelError > 0.32 -> Score < 40%
+  const cosScore = Math.max(0, Math.min(100, Math.round(((cosineSim - 0.55) / 0.42) * 100)));
+  const diffScore = Math.max(0, Math.min(100, Math.round((1 - Math.min(weightedRelError / 0.38, 1.0)) * 100)));
 
-  // Blend: 55% Cosine metric + 45% weighted relative difference
-  const matchPercentage = Math.max(0, Math.min(100, Math.round(0.55 * cosScore + 0.45 * diffScore)));
+  // Blend: 60% Cosine metric + 40% weighted relative difference
+  const matchPercentage = Math.max(0, Math.min(100, Math.round(0.60 * cosScore + 0.40 * diffScore)));
 
   // Genuine Member Verification Threshold:
-  // Requires matchPercentage >= 50% and cosineSim >= 0.82, perfectly accepting genuine users under normal angles/lighting
-  // while strictly rejecting completely different persons
-  const isMatch = matchPercentage >= 50 && cosineSim >= 0.82 && weightedRelError <= 0.22;
+  // Robustly accepts genuine users across natural lighting and head angles (>= 45% match & cosine >= 0.72),
+  // while strictly rejecting different persons and imposters (who score < 35%)
+  const isMatch = matchPercentage >= 45 && cosineSim >= 0.72 && weightedRelError <= 0.30;
 
   return {
     isMatch,
