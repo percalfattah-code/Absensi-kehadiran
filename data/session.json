@@ -1,7 +1,7 @@
 {
   "adminPin": "9876",
   "lateThreshold": "12:00",
-  "isOpen": false,
+  "isOpen": true,
   "endTime": "12:00",
   "id": "active_session",
   "startTime": "18:00",
