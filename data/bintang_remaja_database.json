@@ -1,10 +1,10 @@
 {
   "appName": "Karang Taruna Bintang Remaja - Sistem Absensi Biometrik",
-  "lastUpdated": "2026-08-30T16:24:07.514Z",
+  "lastUpdated": "2026-08-30T16:24:21.715Z",
   "session": {
     "adminPin": "9876",
     "lateThreshold": "12:00",
-    "isOpen": false,
+    "isOpen": true,
     "endTime": "12:00",
     "id": "active_session",
     "startTime": "18:00",
