@@ -1,0 +1,24 @@
+[
+  {
+    "id": "ann_1788025046265_c8ve",
+    "title": "Kerja Bakti Masal Bersama Warga",
+    "description": "Pembersihan lingkungan desa dan drainase persiapan musim hujan. Harap membawa perlengkapan masing-masing.",
+    "eventDate": "2026-09-03",
+    "eventTime": "07:00 WIB",
+    "location": "Lapangan Utama Desa",
+    "category": "KERJA_BAKTI",
+    "isActive": true,
+    "createdAt": 1788025046265
+  },
+  {
+    "id": "ann_1788025046046_nvnq",
+    "title": "Rapat Bulanan Karang Taruna & Evaluasi Program Kerja",
+    "description": "Diharapkan seluruh anggota Karang Taruna Bintang Remaja menghadiri rapat rutin bulanan untuk membahas persiapan turnamen olahraga dan bakti sosial.",
+    "eventDate": "2026-08-31",
+    "eventTime": "19:30 WIB",
+    "location": "Balai Desa RT 04 / Aula Pemuda",
+    "category": "RAPAT",
+    "isActive": true,
+    "createdAt": 1788025046046
+  }
+]
