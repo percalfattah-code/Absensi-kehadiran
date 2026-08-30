@@ -33,6 +33,7 @@ interface LoginScreenProps {
   onConnectGoogleSheets: () => void;
   deferredPrompt?: any;
   onOpenShortcutModal?: () => void;
+  adminPin?: string;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
@@ -41,6 +42,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onConnectGoogleSheets,
   deferredPrompt,
   onOpenShortcutModal,
+  adminPin = '1234',
 }) => {
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState('');
@@ -80,7 +82,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setPinInput(next);
       setPinError(false);
       if (next.length === 4) {
-        if (next === '1234') {
+        if (next === adminPin) {
           audioService.playSuccessChime();
           setTimeout(() => {
             setShowPinModal(false);

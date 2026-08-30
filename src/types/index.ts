@@ -32,6 +32,8 @@ export interface AttendanceSession {
   lateThreshold: string; // HH:mm
   isOpen: boolean;
   adminPin?: string; // Default '1234' for Admin Panel access
+  appLogoIcon?: string; // Icon identifier (e.g. 'star', 'shield', 'flame', 'sparkles', 'crown', 'users', 'heart', 'zap')
+  appLogoUrl?: string; // Custom uploaded logo image DataURL
   autoPdfGenerated?: boolean;
 }
 

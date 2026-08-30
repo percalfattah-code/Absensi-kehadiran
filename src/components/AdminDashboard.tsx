@@ -23,6 +23,7 @@ import {
   ExternalLink,
   UploadCloud,
   RefreshCw,
+  Settings,
 } from 'lucide-react';
 import { AttendanceSession, AttendanceRecord, Member, EventAnnouncement } from '../types';
 import { githubService, GitHubConfig } from '../services/github';
@@ -113,10 +114,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('pengaturan')}
+              className="px-4 py-3.5 btn-3d-violet text-amber-300 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg"
+            >
+              <Settings className="w-4 h-4 text-amber-400" />
+              <span>Pengaturan PIN & Logo</span>
+            </button>
+          )}
+
           {onOpenGitHubModal && (
             <button
               onClick={onOpenGitHubModal}
-              className="px-4 py-3.5 btn-3d-violet text-amber-300 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg"
+              className="px-4 py-3.5 btn-3d-violet text-violet-200 hover:text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg"
             >
               <Github className="w-4 h-4 text-amber-400" />
               <span>GitHub Sync</span>

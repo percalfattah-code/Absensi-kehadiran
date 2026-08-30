@@ -5,11 +5,13 @@ import { ShieldCheck, KeyRound, Lock, AlertCircle, X, Check } from 'lucide-react
 interface AdminAuthModalProps {
   onClose: () => void;
   onSuccess: () => void;
+  adminPin?: string;
 }
 
 export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   onClose,
   onSuccess,
+  adminPin = '1234',
 }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
@@ -30,7 +32,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       setPin(next);
       setError(false);
       if (next.length === 4) {
-        if (next === '1234') {
+        if (next === adminPin) {
           setTimeout(() => {
             onSuccess();
           }, 150);
@@ -63,7 +65,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           </div>
           <h3 className="text-xl font-black text-white">Autentikasi Mode Admin</h3>
           <p className="text-xs text-violet-200/70">
-            Masukkan 4-digit PIN Admin Karang Taruna untuk membuka kontrol penuh. (PIN: <code className="text-amber-300 font-bold">1234</code>)
+            Masukkan 4-digit PIN Admin Karang Taruna untuk membuka kontrol penuh.
           </p>
         </div>
 
@@ -91,7 +93,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
             className="p-2 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold text-center flex items-center justify-center gap-1.5"
           >
             <AlertCircle className="w-4 h-4" />
-            <span>PIN Salah! Gunakan PIN default 1234</span>
+            <span>PIN Salah! Masukkan PIN Admin yang benar.</span>
           </motion.div>
         )}
 

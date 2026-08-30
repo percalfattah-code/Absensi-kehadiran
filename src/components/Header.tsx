@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Star,
   ShieldCheck,
   Smartphone,
   Lock,
@@ -16,6 +15,7 @@ import { AttendanceSession, RoleMode } from '../types';
 import { GoogleSheetsSyncState } from '../services/googleSheets';
 import { audioService } from '../services/audioService';
 import { GitHubSyncIndicator } from './GitHubSyncIndicator';
+import { AppLogo } from './AppLogo';
 
 interface HeaderProps {
   session: AttendanceSession | null;
@@ -62,10 +62,13 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-2.5">
           <button
             onClick={onLogoutToLoginScreen}
-            className="group relative w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-purple-950 flex items-center justify-center font-bold shrink-0 shadow-[0_4px_0_0_#92400e,0_8px_15px_rgba(245,158,11,0.4)] border border-amber-200/60 hover:scale-105 active:scale-95 transition-all"
+            className="group relative cursor-pointer hover:scale-105 active:scale-95 transition-all"
             title="Kembali ke Menu Login Awal"
           >
-            <Star className="w-5 h-5 sm:w-6 sm:h-6 fill-purple-950" />
+            <AppLogo
+              logoIcon={session?.appLogoIcon}
+              logoUrl={session?.appLogoUrl}
+            />
             <span className="absolute -top-1 -right-1 flex h-3 w-3">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isSessionOpen ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
               <span className={`relative inline-flex rounded-full h-3 w-3 ${isSessionOpen ? 'bg-emerald-400' : 'bg-rose-500'}`}></span>

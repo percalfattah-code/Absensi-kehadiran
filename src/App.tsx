@@ -541,6 +541,7 @@ export default function App() {
           onConnectGoogleSheets={handleConnectGoogleSheets}
           deferredPrompt={deferredPrompt}
           onOpenShortcutModal={() => setIsInstallModalOpen(true)}
+          adminPin={session?.adminPin || '1234'}
         />
         {isInstallModalOpen && (
           <AndroidShortcutModal
@@ -826,6 +827,7 @@ export default function App() {
         <AdminAuthModal
           onClose={() => setIsAdminAuthModalOpen(false)}
           onSuccess={handleAdminAuthSuccess}
+          adminPin={session?.adminPin || '1234'}
         />
       )}
 
