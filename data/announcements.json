@@ -1,5 +1,16 @@
 [
   {
+    "id": "ann_1788106336962_s3en",
+    "title": "sosial",
+    "description": "mangkat labeh",
+    "eventDate": "2026-08-31",
+    "eventTime": "19:30 WIB",
+    "location": "Balai Warga Karang Taruna",
+    "category": "ACARA_SOSIAL",
+    "isActive": true,
+    "createdAt": 1788106336962
+  },
+  {
     "id": "ann_1788025046265_c8ve",
     "title": "Kerja Bakti Masal Bersama Warga",
     "description": "Pembersihan lingkungan desa dan drainase persiapan musim hujan. Harap membawa perlengkapan masing-masing.",
